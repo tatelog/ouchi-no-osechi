@@ -199,7 +199,6 @@ async function openTableFlip(catching=false,chosenMood=null) {
      },
      title+'.png'
    );
-   if(!replaying)share.onclick();
  }
  const flightRate=1.45;
  function landingEffect(p){overlay.land(p);burst(p.mesh.position,16)}
@@ -295,7 +294,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
      return;
    }
    if(phase==='angle'){angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
-   if(phase==='power'){power=(8+15*wave(now))*boost;lastShot={angle,power};beginFlip(false)}
+   if(phase==='power'){power=(19+6*wave(now))*boost;lastShot={angle,power};beginFlip(false)}
  };
  function release(){
    table.updateMatrixWorld(true);

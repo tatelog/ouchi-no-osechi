@@ -216,7 +216,7 @@ function more(){const d=draft(),t=d.tier,seen=d.seen[t],index=Array.from({length
 const [title,ids,labels]=questions[index];function answer(id,k){seen.push(index);if(id!=null){const row=d.tiers[t],locks=d.locks[t];let dest=row.indexOf(id);if(dest<0)dest=row.findIndex(v=>v==null);if(dest<0)dest=locks.lastIndexOf(false);if(dest<0){pending=id;render();notice('入れ替えたい区画を選んでください');return}put(dest,id);if(index===0)d.kam=k}render();pauseMenu()}
 ask(title,[...ids.map((id,k)=>[labels?.[k]||names[id],()=>answer(id,k),'choice',id,index===0?k:undefined]),['覚えていない・今回は見送る',()=>answer(null)],['残りはおまかせで完成',finish]])}
 function pauseMenu(){const d=draft(),t=d.tier,opts=[];if(d.seen[t].length<questions.length)opts.push(['もう少し選ぶ',more,'primary']);if(t<d.tiers.length-1)opts.push([tierNames[t+1]+'へ',()=>{d.tier++;render();more()}]);opts.push(['お重を見る',render],['残りはおまかせで完成',finish]);ask(tierNames[t]+'、どうする？',opts)}
-function finish(){const d=draft();if(!d.tiers.some(r=>r.some(i=>i!=null))){notice('まず一品、選んでください');return}d.phase='done';selected=pending=null;render();shareMenu()}
+function finish(){const d=draft();if(!d.tiers.some(r=>r.some(i=>i!=null))){notice('まず一品、選んでください');return}d.phase='done';selected=pending=null;render()}
 function result(){
  const d=draft(),el=document.createElement('section');el.className='result overview';
  el.innerHTML='<div class="result-heading"><h2>おうちのおせち、完成</h2></div><div class="all-tiers"></div><div class="actions"></div>';
