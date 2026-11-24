@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#f8edd9">
 <title>おうちのおせち｜30秒予告</title>
-<meta name="description" content="「春の海」にのせて、お重の盛り付けからちゃぶ台返しまでを30秒で。">
+<meta name="description" content="おせちを作る準備をしましょう。スマホで選んで詰めたら、おじいちゃんのちゃぶ台返しと、おばあちゃんの空中キャッチ。「春の海」にのせた30秒予告です。">
 <meta property="og:type" content="video.other"><meta property="og:title" content="おうちのおせち｜30秒予告">
 <meta property="og:description" content="おせちを作る準備をしましょう。最後の10秒はちゃぶ台返しと空中キャッチ！">
 <meta property="og:url" content="https://tatelog.github.io/ouchi-no-osechi/preview/">
@@ -13,30 +13,70 @@
 <link rel="icon" href="../assets/brand/favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/icon-180.png">
 <style>
 @font-face{font-family:klee;src:url(../assets/KleeOne-SemiBold.ttf);font-display:swap}
-*{box-sizing:border-box}body{margin:0;color:#3e2a1a;background:#f8edd9 url(../assets/fiber.webp);font:600 16px/1.5 klee,serif}
-main{width:min(100%,34rem);margin:auto;padding: max(8px,env(safe-area-inset-top)) 14px max(12px,env(safe-area-inset-bottom))}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}header a{display:flex;align-items:center;min-height:44px}header img{width:148px;height:auto}h1{font-size:17px;margin:0}
-.player{position:relative;aspect-ratio:9/16;width:min(100%,calc((100svh - 152px)*9/16));margin:auto;overflow:hidden;border-radius:14px;background:#f7ecd0;box-shadow:0 3px 14px #57331540}
-video{display:block;width:100%;height:100%;object-fit:contain}
-.start,.play-link{font:inherit;cursor:pointer;border:0;border-radius:12px;min-height:48px;background:#a13220 url(../assets/art/crayon-red.png) center/cover;color:#fff7e6;text-decoration:none;text-align:center;text-shadow:0 1px 2px #69261c}
-.start{position:absolute;bottom:8%;left:50%;transform:translateX(-50%);width:max-content;padding:8px 22px;box-shadow:0 2px 7px #4d281c44}.start[hidden]{display:none}
-.play-link{display:grid;place-items:center;width:min(100%,27rem);margin:10px auto 4px}
-details{font-size:13px;text-align:center}summary{cursor:pointer;min-height:32px;padding:6px}details p{margin:3px auto 8px}details a{color:#802f1b}
-:focus-visible{outline:3px solid #3c604e;outline-offset:2px}
-@media(orientation:landscape) and (max-height:550px){main{max-width:50rem;width:100%;display:grid;grid-template-columns:1fr 1fr;align-content:center;gap:8px}header,.play-link,details{grid-column:2}.player{grid-column:1;grid-row:1/5;width:min(100%,calc((100svh - 20px)*9/16))}}
+*{box-sizing:border-box}
+html{background:#f8edd9}
+body{margin:0;color:#3a2618;background:#f8edd9 url(../assets/fiber.webp);font:600 16px/1.6 klee,"Hiragino Mincho ProN","Yu Mincho",serif;-webkit-tap-highlight-color:transparent}
+main{--bar:76px;display:flex;flex-direction:column;align-items:center;padding:max(8px,env(safe-area-inset-top)) 10px calc(var(--bar) + env(safe-area-inset-bottom) + 14px)}
+h1{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.player{position:relative;aspect-ratio:9/16;width:min(100%,calc((100svh - var(--bar) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px)*9/16));overflow:hidden;border-radius:16px;background:#f7ecd0 url(./poster.jpg?v=2) center/cover;box-shadow:0 4px 0 #3a261822,0 10px 24px #57331533;transform:rotate(-.4deg)}
+video{display:block;width:100%;height:100%;object-fit:cover}
+.tap{position:absolute;inset:0;display:grid;place-items:end center;padding:0 0 13%;border:0;background:none;font:inherit;color:inherit;cursor:pointer}
+.tap span{display:block;padding:14px 30px 15px;border-radius:999px;background:#b02c1e url(../assets/art/crayon-red.png) center/cover;color:#fff7e6;font-size:clamp(21px,6vw,28px);line-height:1.2;box-shadow:0 4px 0 #6d1d14,0 10px 18px #3a261844;text-shadow:0 1px 2px #69261c;transform:rotate(-2deg)}
+.tap small{display:block;font-size:.58em;opacity:.92}
+.tap.playing{place-items:center;padding:0}.tap.playing span{display:none}
+.tap.paused span{display:block}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:2;display:grid;grid-template-columns:60px 60px 1fr;gap:10px;align-items:center;height:calc(var(--bar,76px) + env(safe-area-inset-bottom));padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#fbf3e2f2;border-top:2px solid #3a261822;backdrop-filter:blur(6px)}
+.bar button,.bar a{display:grid;place-items:center;height:60px;border-radius:16px;font:inherit;cursor:pointer;text-decoration:none}
+.bar button{border:2px solid #3a2618;background:#fffaf0;color:#3a2618;font-size:13px;line-height:1.1;padding:0}
+.bar button b{display:block;font-size:22px;line-height:1}
+.bar a{border:0;background:#b02c1e url(../assets/art/crayon-red.png) center/cover;color:#fff7e6;font-size:22px;box-shadow:0 3px 0 #6d1d14;text-shadow:0 1px 2px #69261c}
+.bar button:active,.bar a:active{transform:translateY(2px)}
+details{width:min(100%,30rem);margin-top:16px;font-size:13.5px}
+summary{cursor:pointer;min-height:44px;padding:10px;text-align:center}
+details p{margin:4px 6px 10px}details a{color:#802f1b;overflow-wrap:anywhere}
+:focus-visible{outline:3px solid #3c604e;outline-offset:3px}
+@media(orientation:landscape) and (max-height:520px){main{--bar:64px}.bar button,.bar a{height:48px}}
 </style>
 </head><body><main>
-<header><a href="../" aria-label="おうちのおせち ホームへ"><img src="../assets/art/ouchi-title.webp" alt="おうちのおせち"></a><h1>30秒予告</h1></header>
-<div class="player"><video playsinline preload="none" controls poster="./poster.jpg" aria-label="おうちのおせち 30秒予告。盛り付け、ちゃぶ台返し、空中キャッチの順に紹介します"><source src="./ouchi-no-osechi-30s.mp4" type="video/mp4"> <a href="./ouchi-no-osechi-30s.mp4">動画を開く</a></video><button class="start" type="button" hidden>▶ 音付きで再生</button></div>
-<a class="play-link" href="../">おせちを作る</a>
-<details><summary>音楽とクレジット</summary><p>「春の海」作曲・宮城道雄。編曲・フルートはAlexander Gagarin、演奏はZhukovsky Symphony Orchestra、指揮はKonstantin Naumenko。2020年2月16日の録音から30秒を抜粋し、フェードを加えました。</p><p><a href="https://imslp.org/wiki/Haru_no_Umi_(Miyagi,_Michio)">録音の出典</a>　<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">録音・予告動画のライセンス（CC BY-NC-SA 4.0）</a></p></details>
-</main><script>
-const video=document.querySelector('video'),start=document.querySelector('.start');
-start.hidden=false;video.controls=false;
-start.onclick=async()=>{
-  video.controls=true;video.muted=false;
-  try{await video.play()}catch{start.hidden=false;start.textContent='▶ もう一度再生'}
-};
-video.addEventListener('playing',()=>{start.hidden=true});
-video.addEventListener('ended',()=>{video.controls=false;start.textContent='▶ もう一度見る';start.hidden=false});
+<h1>おうちのおせち 30秒予告</h1>
+<div class="player">
+<video playsinline preload="metadata" poster="./poster.jpg?v=2" aria-label="おうちのおせち 30秒予告。前半はおせちをスマホで選んでお重に詰める様子、後半はおじいちゃんのちゃぶ台返しとおばあちゃんの空中キャッチ"><source src="./ouchi-no-osechi-30s.mp4?v=2" type="video/mp4"><a href="./ouchi-no-osechi-30s.mp4?v=2">動画を開く</a></video>
+<button class="tap" type="button" aria-label="音つきで再生する"><span>▶ 音つきで見る<small>30秒・タップひとつで再生</small></span></button>
+</div>
+<details><summary>音楽とクレジット</summary>
+<p>♪「春の海」宮城道雄 作曲／フルートと管弦楽版　Alexander Gagarinov（編曲・フルート）、Zhukovsky Symphony Orchestra、Konstantin Naumenko（指揮）。2020年2月16日の演奏。</p>
+<p>出典 <a href="https://imslp.org/wiki/Haru_no_Umi_(Miyagi,_Michio)">IMSLP「Haru no Umi (Miyagi, Michio)」</a>／録音のライセンス <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a></p>
+<p>この予告では、録音の冒頭と中間部の2か所を抜粋してつなぎ、フェードと効果音を加えています。予告動画も同じ CC BY-NC-SA 4.0 で公開します。</p>
+<p>書体　Klee One、Noto Sans JP、Noto Serif JP（SIL Open Font License 1.1）</p>
+</details>
+</main>
+<nav class="bar" aria-label="操作">
+<button type="button" id="play" aria-label="再生"><span><b>▶</b>再生</span></button>
+<button type="button" id="mute" aria-label="音を消す" aria-pressed="false"><span><b>♪</b>音あり</span></button>
+<a href="../">おせちを作る</a>
+</nav>
+<script>
+const v=document.querySelector('video'),tap=document.querySelector('.tap'),label=tap.querySelector('span'),
+  play=document.getElementById('play'),mute=document.getElementById('mute');
+const set=(b,mark,text,aria)=>{b.firstElementChild.innerHTML='<b>'+mark+'</b>'+text;b.setAttribute('aria-label',aria)};
+const big=(main,sub)=>{label.innerHTML=main+'<small>'+sub+'</small>'};
+async function toggle(){
+  if(!v.paused&&!v.ended){v.pause();return}
+  if(v.ended)v.currentTime=0;
+  try{await v.play()}
+  catch{v.muted=true;sync();try{await v.play()}catch{big('▶ もう一度タップ','再生できませんでした')}}
+}
+function sync(){
+  const on=!v.paused&&!v.ended;
+  tap.classList.toggle('playing',on);tap.classList.toggle('paused',!on);
+  tap.setAttribute('aria-label',on?'一時停止する':'音つきで再生する');
+  set(play,on?'Ⅱ':'▶',on?'止める':'再生',on?'一時停止':'再生');
+  set(mute,v.muted?'×':'♪',v.muted?'音なし':'音あり',v.muted?'音を出す':'音を消す');
+  mute.setAttribute('aria-pressed',String(v.muted));
+}
+tap.onclick=toggle;play.onclick=toggle;
+mute.onclick=()=>{v.muted=!v.muted;sync()};
+v.addEventListener('play',sync);v.addEventListener('volumechange',sync);
+v.addEventListener('pause',()=>{if(!v.ended)big('▶ つづきを見る','タップで再開');sync()});
+v.addEventListener('ended',()=>{big('▶ もう一度見る','下の「おせちを作る」で遊べます');sync()});
 </script></body></html>
