@@ -57,7 +57,7 @@ function migrateMeals(){
 }
 async function showHome(){
  document.body.classList.add('at-home');document.body.classList.remove('choosing');
- content.innerHTML='<section class="home"><div class="home-choices"></div><a class="trailer-link" href="./preview/">▶ 30秒の予告を見る</a><h2>これまでのお重</h2><div class="meal-history" aria-live="polite"></div></section>';
+ content.innerHTML='<section class="home"><div class="home-choices"></div><a class="trailer-link" href="./preview/">▶ 予告編を見る</a><h2>これまでのお重</h2><div class="meal-history" aria-live="polite"></div></section>';
  const list=content.querySelector('.meal-history');
  for(const [mode,title,sub,id] of [['auto','おすすめ','質問に答えてお重を作る',6],['hand','自分で詰める','好きな料理を選んで詰める',0]]){
   const b=button('',()=>{state.mode=mode;state.drafts[mode]=fresh(mode);selected=pending=null;filter=0;render()},'home-choice');
