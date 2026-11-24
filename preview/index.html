@@ -12,71 +12,126 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="../assets/brand/favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/icon-180.png">
 <style>
-@font-face{font-family:klee;src:url(../assets/KleeOne-SemiBold.ttf);font-display:swap}
+@font-face{font-family:klee;src:url(../assets/KleeOne-SemiBold.ttf) format("truetype");font-weight:600;font-display:swap}
+:root{
+  --paper:#f8edd9;--ink:#2e2019;--shu:#b5301f;--shu-deep:#74200f;--cream:#fff6e3;
+  --vh:100vh;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+  --sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px);
+  --head:34px;--act:58px;
+  /* 縦画面：見出し・動画・ボタンが1画面に収まる幅（9:16は切らない） */
+  --pw:min(100%,calc((var(--vh) - var(--st) - var(--sb) - var(--head) - var(--act) - 34px)*9/16));
+}
+@supports(height:100svh){:root{--vh:100svh}}
 *{box-sizing:border-box}
-html{background:#f8edd9}
-body{margin:0;color:#3a2618;background:#f8edd9 url(../assets/fiber.webp);font:600 16px/1.6 klee,"Hiragino Mincho ProN","Yu Mincho",serif;-webkit-tap-highlight-color:transparent}
-main{--bar:76px;display:flex;flex-direction:column;align-items:center;padding:max(8px,env(safe-area-inset-top)) 10px calc(var(--bar) + env(safe-area-inset-bottom) + 14px)}
-h1{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-.player{position:relative;aspect-ratio:9/16;width:min(100%,calc((100svh - var(--bar) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px)*9/16));overflow:hidden;border-radius:16px;background:#f7ecd0 url(./poster.jpg?v=2) center/cover;box-shadow:0 4px 0 #3a261822,0 10px 24px #57331533;transform:rotate(-.4deg)}
-video{display:block;width:100%;height:100%;object-fit:cover}
-.tap{position:absolute;inset:0;display:grid;place-items:end center;padding:0 0 13%;border:0;background:none;font:inherit;color:inherit;cursor:pointer}
-.tap span{display:block;padding:14px 30px 15px;border-radius:999px;background:#b02c1e url(../assets/art/crayon-red.png) center/cover;color:#fff7e6;font-size:clamp(21px,6vw,28px);line-height:1.2;box-shadow:0 4px 0 #6d1d14,0 10px 18px #3a261844;text-shadow:0 1px 2px #69261c;transform:rotate(-2deg)}
-.tap small{display:block;font-size:.58em;opacity:.92}
-.tap.playing{place-items:center;padding:0}.tap.playing span{display:none}
-.tap.paused span{display:block}
-.bar{position:fixed;left:0;right:0;bottom:0;z-index:2;display:grid;grid-template-columns:60px 60px 1fr;gap:10px;align-items:center;height:calc(var(--bar,76px) + env(safe-area-inset-bottom));padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:#fbf3e2f2;border-top:2px solid #3a261822;backdrop-filter:blur(6px)}
-.bar button,.bar a{display:grid;place-items:center;height:60px;border-radius:16px;font:inherit;cursor:pointer;text-decoration:none}
-.bar button{border:2px solid #3a2618;background:#fffaf0;color:#3a2618;font-size:13px;line-height:1.1;padding:0}
-.bar button b{display:block;font-size:22px;line-height:1}
-.bar a{border:0;background:#b02c1e url(../assets/art/crayon-red.png) center/cover;color:#fff7e6;font-size:22px;box-shadow:0 3px 0 #6d1d14;text-shadow:0 1px 2px #69261c}
-.bar button:active,.bar a:active{transform:translateY(2px)}
-details{width:min(100%,30rem);margin-top:16px;font-size:13.5px}
-summary{cursor:pointer;min-height:44px;padding:10px;text-align:center}
-details p{margin:4px 6px 10px}details a{color:#802f1b;overflow-wrap:anywhere}
+html{background:var(--paper);-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--ink);background:var(--paper) url(../assets/fiber.webp);font:600 16px/1.6 klee,"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;-webkit-tap-highlight-color:transparent}
+a{color:inherit}
 :focus-visible{outline:3px solid #3c604e;outline-offset:3px}
-@media(orientation:landscape) and (max-height:520px){main{--bar:64px}.bar button,.bar a{height:48px}}
+
+main{display:grid;grid-template-columns:var(--pw);justify-content:center;
+  padding:max(6px,var(--st)) max(12px,var(--sr)) max(10px,var(--sb)) max(12px,var(--sl))}
+
+/* 柱（誌面の上端の一行） */
+.head{display:flex;align-items:center;gap:8px;height:var(--head);margin-bottom:8px;white-space:nowrap;overflow:hidden}
+h1{margin:0;font-size:17px;line-height:1;letter-spacing:.06em}
+h1 img{display:none}
+.kicker{margin:0 0 0 auto;display:flex;align-items:center;gap:6px;font-size:13px;line-height:1;letter-spacing:.08em}
+.shin{padding:4px 5px 3px;border-radius:3px 4px 3px 5px;background:var(--shu) url(../assets/art/crayon-red.png) center/cover;color:var(--cream);font-size:11px;letter-spacing:.1em}
+.oto{margin:0;font-size:11px;line-height:1;opacity:.72}
+.oto::before{content:"／";margin-right:4px;opacity:.5}
+
+/* 主役：縦9:16の動画 */
+.player{position:relative;aspect-ratio:9/16;width:100%;overflow:hidden;border-radius:6px;background:#f7ecd0 url(./poster.jpg?v=2) center/cover;box-shadow:0 1px 0 #2e201930,0 16px 30px -14px #2e201977}
+video{display:block;width:100%;height:100%;object-fit:contain}
+
+/* 見終わったあとだけ出る。下端の標準コントロールは隠さない */
+.fin{position:absolute;inset:0 0 auto;height:76%;display:grid;align-content:center;justify-items:stretch;gap:12px;padding:0 13%;background:linear-gradient(#f8edd9f5,#f8edd9ee 68%,#f8edd900);pointer-events:none}
+.fin[hidden]{display:none}
+.fin>*{pointer-events:auto}
+
+.btn{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:var(--act);padding:0 14px;border-radius:12px 15px 12px 16px/15px 12px 16px 12px;font:inherit;line-height:1.15;text-decoration:none;white-space:nowrap;cursor:pointer}
+.btn:active{transform:translateY(2px)}
+.go{border:0;background:var(--shu) url(../assets/art/crayon-red.png) center/cover;color:var(--cream);font-size:clamp(17px,5.4vw,21px);letter-spacing:.06em;box-shadow:0 3px 0 var(--shu-deep);text-shadow:0 1px 2px #69261c}
+.go:active{box-shadow:0 1px 0 var(--shu-deep)}
+.sub{border:2px solid var(--ink);background:#fbf3e2 url(../assets/art/crayon-cream.png) center/cover;color:var(--ink);font-size:15px}
+.sub small{font-size:11px;opacity:.7;letter-spacing:.04em}
+
+.acts{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px}
+
+.more{margin-top:8px;font-size:13.5px}
+.direct{margin:0;text-align:center}
+.direct a{display:inline-block;padding:12px 8px;color:#7a2a18}
+details{border-top:1px solid #2e201933}
+summary{min-height:48px;padding:12px 4px;cursor:pointer;text-align:center}
+details p{margin:4px 4px 10px}
+details a{color:#7a2a18;overflow-wrap:anywhere}
+
+@media(max-width:349px){.oto{display:none}}
+
+/* 横長の画面（デスクトップ・スマホ横向き）：左に紙の余白と題字、右に動画 */
+@media(min-aspect-ratio:1/1){
+  :root{--pad:clamp(10px,4.5vh,56px);--ph:min(calc(var(--vh) - var(--pad)*2),880px)}
+  main{grid-template-columns:minmax(0,27rem) calc(var(--ph)*9/16);grid-template-rows:auto 1fr auto auto;
+    grid-template-areas:"head player" ". player" "acts player" "more player";
+    column-gap:clamp(20px,7vw,104px);min-height:var(--vh);align-content:center;
+    padding:var(--pad) max(20px,var(--sr)) var(--pad) max(20px,var(--sl))}
+  .head{grid-area:head;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:start;gap:10px clamp(12px,3vw,32px);height:auto;margin:0;overflow:visible;white-space:normal}
+  h1{grid-area:1/1;font-size:0}
+  h1 img{display:block;max-width:100%;max-height:30vh;width:auto;height:auto;mix-blend-mode:multiply}
+  h1 span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+  .kicker{grid-area:1/2/3/3;margin:0;writing-mode:vertical-rl;gap:.5em;font-size:clamp(22px,6.4vh,56px);letter-spacing:.14em}
+  .shin{font-size:.42em;padding:.7em .45em .6em}
+  .tcy{-webkit-text-combine:horizontal;text-combine-upright:all}
+  .oto{grid-area:2/1;font-size:13px;line-height:1.4}
+  .oto::before{content:none}
+  .player{grid-area:player;align-self:start;width:auto;height:var(--ph)}
+  .acts{grid-area:acts;margin-top:16px}
+  .go{font-size:clamp(17px,2vw,21px)}
+  .more{grid-area:more}
+  .direct,summary{text-align:left}
+  .direct a{padding-left:4px}
+}
 </style>
 </head><body><main>
-<h1>おうちのおせち 30秒予告</h1>
+<header class="head">
+<h1><img src="../assets/art/ouchi-title.webp" alt="" loading="lazy"><span>おうちのおせち</span></h1>
+<p class="kicker"><span class="shin">新春</span><span><span class="tcy">30</span>秒予告</span></p>
+<p class="oto">音が出ます</p>
+</header>
 <div class="player">
-<video playsinline preload="metadata" poster="./poster.jpg?v=2" aria-label="おうちのおせち 30秒予告。前半はおせちをスマホで選んでお重に詰める様子、後半はおじいちゃんのちゃぶ台返しとおばあちゃんの空中キャッチ"><source src="./ouchi-no-osechi-30s.mp4?v=real-hand" type="video/mp4"><a href="./ouchi-no-osechi-30s.mp4?v=real-hand">動画を開く</a></video>
-<button class="tap" type="button" aria-label="音つきで再生する"><span>▶ 音つきで見る<small>30秒・タップひとつで再生</small></span></button>
+<video controls playsinline preload="metadata" poster="./poster.jpg?v=2" aria-label="おうちのおせち 30秒予告。質問からおすすめのお重を作る方法と、自分で料理を選んで詰める方法。完成したお重でちゃぶ台返しと空中キャッチ"><source src="./ouchi-no-osechi-30s.mp4?v=two-modes" type="video/mp4"><a href="./ouchi-no-osechi-30s.mp4?v=two-modes">動画を開く</a></video>
+<div class="fin" hidden>
+<a class="btn go" href="../">おせちを作る</a>
+<button class="btn sub" type="button">もう一度見る</button>
 </div>
+</div>
+<nav class="acts" aria-label="このあと">
+<a class="btn go" href="../">おせちを作る</a>
+<a class="btn sub" href="./ouchi-no-osechi-30s.mp4?v=two-modes" download="ouchi-no-osechi-30s.mp4">MP4を保存<small>16.3MB</small></a>
+</nav>
+<div class="more">
+<p class="direct"><a href="./ouchi-no-osechi-30s.mp4?v=two-modes">再生できないときは、動画を直接開く</a></p>
 <details><summary>音楽とクレジット</summary>
 <p>♪「春の海」宮城道雄 作曲／フルートと管弦楽版　Alexander Gagarinov（編曲・フルート）、Zhukovsky Symphony Orchestra、Konstantin Naumenko（指揮）。2020年2月16日の演奏。</p>
 <p>出典 <a href="https://imslp.org/wiki/Haru_no_Umi_(Miyagi,_Michio)">IMSLP「Haru no Umi (Miyagi, Michio)」</a>／録音のライセンス <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a></p>
 <p>この予告では、録音の冒頭と中間部の2か所を抜粋してつなぎ、フェードと効果音を加えています。予告動画も同じ CC BY-NC-SA 4.0 で公開します。</p>
 <p>書体　Klee One、Noto Sans JP、Noto Serif JP（SIL Open Font License 1.1）</p>
 </details>
+</div>
 </main>
-<nav class="bar" aria-label="操作">
-<button type="button" id="play" aria-label="再生"><span><b>▶</b>再生</span></button>
-<button type="button" id="mute" aria-label="音を消す" aria-pressed="false"><span><b>♪</b>音あり</span></button>
-<a href="../">おせちを作る</a>
-</nav>
 <script>
-const v=document.querySelector('video'),tap=document.querySelector('.tap'),label=tap.querySelector('span'),
-  play=document.getElementById('play'),mute=document.getElementById('mute');
-const set=(b,mark,text,aria)=>{b.firstElementChild.innerHTML='<b>'+mark+'</b>'+text;b.setAttribute('aria-label',aria)};
-const big=(main,sub)=>{label.innerHTML=main+'<small>'+sub+'</small>'};
-async function toggle(){
-  if(!v.paused&&!v.ended){v.pause();return}
-  if(v.ended)v.currentTime=0;
-  try{await v.play()}
-  catch{v.muted=true;sync();try{await v.play()}catch{big('▶ もう一度タップ','再生できませんでした')}}
-}
-function sync(){
-  const on=!v.paused&&!v.ended;
-  tap.classList.toggle('playing',on);tap.classList.toggle('paused',!on);
-  tap.setAttribute('aria-label',on?'一時停止する':'音つきで再生する');
-  set(play,on?'Ⅱ':'▶',on?'止める':'再生',on?'一時停止':'再生');
-  set(mute,v.muted?'×':'♪',v.muted?'音なし':'音あり',v.muted?'音を出す':'音を消す');
-  mute.setAttribute('aria-pressed',String(v.muted));
-}
-tap.onclick=toggle;play.onclick=toggle;
-mute.onclick=()=>{v.muted=!v.muted;sync()};
-v.addEventListener('play',sync);v.addEventListener('volumechange',sync);
-v.addEventListener('pause',()=>{if(!v.ended)big('▶ つづきを見る','タップで再開');sync()});
-v.addEventListener('ended',()=>{big('▶ もう一度見る','下の「おせちを作る」で遊べます');sync()});
+// 見終わったら「おせちを作る／もう一度見る」を動画の上に出す。失敗しても標準コントロールと下のリンクは使える。
+(function(){
+  var v=document.querySelector('video'),fin=document.querySelector('.fin');
+  if(!v||!fin)return;
+  function show(on){fin.hidden=!on}
+  v.addEventListener('ended',function(){show(true)});
+  v.addEventListener('play',function(){show(false)});
+  v.addEventListener('seeking',function(){show(false)});
+  fin.querySelector('button').addEventListener('click',function(){
+    show(false);v.currentTime=0;
+    var p=v.play();if(p&&p.catch)p.catch(function(){});
+  });
+})();
 </script></body></html>
