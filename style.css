@@ -133,3 +133,9 @@ dialog.flip-game[open]{
 }
 
 .flip-game .flip-stage canvas.catch-track{z-index:1;inset:auto 3% 8px;width:94%;height:32px;border:1px solid #ad895a;border-radius:6px;touch-action:none;cursor:pointer}
+.flip-ink{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2;border-radius:inherit}
+.flip-ink svg{position:absolute;inset:0;width:100%;height:100%;fill:#402416}
+.flip-ink i{position:absolute;width:40%;aspect-ratio:1;border:5px double #ffe49a;border-radius:50%;box-shadow:0 0 0 2px #a34b24}
+.flip-ink strong{position:absolute;display:grid;place-items:center;isolation:isolate;white-space:nowrap;padding:1em 1.1em 1.35em;font:bold clamp(20px,4vmin,42px)/1 klee,serif;color:#361c16;filter:drop-shadow(2px 4px 0 #5a302892)}
+.flip-ink strong::before,.flip-ink strong::after{content:"";position:absolute;inset:0;background:#391f1b;z-index:-2;clip-path:polygon(0 34%,13% 29%,7% 9%,26% 16%,33% 0,44% 12%,58% 2%,64% 13%,85% 2%,82% 18%,99% 18%,90% 38%,100% 48%,90% 57%,98% 78%,78% 75%,76% 92%,60% 82%,48% 96%,40% 84%,18% 100%,21% 81%,3% 85%,9% 63%,0 57%,8% 46%)}
+.flip-ink strong::after{inset:4px;background:#fff7d7;z-index:-1}

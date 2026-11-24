@@ -1,8 +1,8 @@
 export const moods=[
- {name:'ほろよい',pace:1,range:20,sprint:22,reach:.85,sway:.12},
- {name:'酔っ払い',pace:1.25,range:40,sprint:34,reach:.76,sway:.32},
- {name:'泥酔',pace:1.55,range:68,sprint:49,reach:.69,sway:.55},
- {name:'やけくそ',pace:1.9,range:100,sprint:70,reach:.62,sway:.8}
+ {name:'ほろよい',pace:1,power:14,sprint:22,reach:.85,sway:.12},
+ {name:'酔っ払い',pace:1.25,power:20,sprint:34,reach:.76,sway:.32},
+ {name:'泥酔',pace:1.55,power:27,sprint:49,reach:.69,sway:.55},
+ {name:'やけくそ',pace:1.9,power:35,sprint:70,reach:.62,sway:.8}
 ];
 
 export function elder(T,scene,grandma){
@@ -34,29 +34,44 @@ export function elder(T,scene,grandma){
  return {body,mouth};
 }
 
-// Identical launch and air resistance for manual throws and automatic throws.
+// Linear air drag acts on every axis. These equations are also used by the angle search.
+const gravity=9.81;
+export function travelTime(drag,t){return -Math.expm1(-drag*t)/drag}
+export function throwHeight(originY,vy,drag,t){
+ const travel=travelTime(drag,t);
+ return originY+vy*travel-gravity*(t-travel)/drag;
+}
 export function throwVelocity(p,power,radians){
  const response=.86+((p.id*37+11)%47)/100;
  const drag=.035+((p.id*19+5)%29)/110;
- const vx=power*response*Math.cos(radians),vy=power*response*Math.sin(radians);
- const land=(vy+Math.sqrt(vy*vy+19.62*Math.max(.01,p.origin.y-.09)))/9.81;
- return {vx,vy,drag,land,vz:Math.sin(p.id*2.3)*1.7};
-}
-export function travelTime(drag,t){return -Math.expm1(-drag*t)/drag}
-export function autoPower(pieces,radians,range){
- function farthest(power){
-   return Math.max(...pieces.map(p=>{
-     const v=throwVelocity(p,power,radians);
-     return v.vx*travelTime(v.drag,v.land);
-   }));
- }
- let low=0,high=32;
- while(farthest(high)<range)high*=2;
+ const speed=power*response,sideAngle=Math.sin(p.id*2.3)*.055;
+ const horizontal=speed*Math.cos(radians),vy=speed*Math.sin(radians);
+ const peak=Math.log1p(drag*vy/gravity)/drag;
+ let low=peak,high=peak+1;
+ while(throwHeight(p.origin.y,vy,drag,high)>.09)high=peak+2*(high-peak);
  for(let i=0;i<28;i++){
    const mid=(low+high)/2;
-   if(farthest(mid)<range)low=mid;else high=mid;
+   if(throwHeight(p.origin.y,vy,drag,mid)>.09)low=mid;else high=mid;
  }
- return (low+high)/2;
+ return {vx:horizontal*Math.cos(sideAngle),vy,vz:horizontal*Math.sin(sideAngle),drag,peak,land:(low+high)/2};
+}
+export function bestThrowAngle(pieces,power){
+ let bestDistance=-1,bestAngle=0;
+ // Maximize each dish's downrange distance; the strongest candidate wins the shared throw.
+ for(const p of pieces){
+   function distance(angle){
+     const v=throwVelocity(p,power,angle);
+     return v.vx*travelTime(v.drag,v.land);
+   }
+   let low=0,high=Math.PI/2;
+   for(let step=0;step<24;step++){
+     const third=(high-low)/3;
+     if(distance(low+third)<distance(high-third))low+=third;else high-=third;
+   }
+   const angle=(low+high)/2,range=distance(angle);
+   if(range>bestDistance){bestDistance=range;bestAngle=angle}
+ }
+ return bestAngle*180/Math.PI;
 }
 
 export function catchingGame({T,surface,pieces,status,grandma,track,onFinish}){

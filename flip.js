@@ -6,7 +6,7 @@ function chooseGrandpaMood(moods,onSelect){
 async function openTableFlip(catching=false,chosenMood=null) {
  if(catching&&!chosenMood){
    try{
-     const {moods}=await import('./catch.js?v=2');
+     const {moods}=await import('./catch.js?v=3');
      chooseGrandpaMood(moods,mood=>openTableFlip(true,mood));
    }catch{notice('コンディションを読み込めませんでした。もう一度お試しください')}
    return;
@@ -46,7 +46,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,autoPower}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=2')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=3')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -95,13 +95,12 @@ async function openTableFlip(catching=false,chosenMood=null) {
    const mesh=new T.Mesh(new T.BoxGeometry(w,h,l),new T.MeshStandardMaterial({color,roughness:.4}));
    mesh.position.set(x,y,z);parent.add(mesh);return mesh;
  }
- box(scene,90,-.15,0,450,.3,130,0xb7af78);
- for(let m=0;m<=220;m+=5)box(scene,m,.012,0,.055,.02,m%10===0?9:5,0xf6e3af);
+ box(scene,350,-.15,0,900,.3,200,0xb7af78);
+ for(let m=0;m<=750;m+=5)box(scene,m,.012,0,.055,.02,m%10===0?9:5,0xf6e3af);
  const table=group(scene);
  const rows=meal.tiers;
- const columns=Math.min(2,rows.length),depth=Math.ceil(rows.length/columns);
- const trayScale=rows.length===1?1:.78;
- const tableWidth=columns*3*trayScale+.65,tableDepth=depth*2.9*trayScale+.48;
+ const layers=[];
+ const tableWidth=3.65,tableDepth=3.38;
  box(table,0,1.02,0,tableWidth,.18,tableDepth,0x84412b);
  for(const x of [-1,1])for(const z of [-1,1])box(table,x*(tableWidth/2-.25),.48,z*(tableDepth/2-.25),.19,.96,.19,0x653321);
  const grandpa=elder(T,scene,false);grandpa.body.position.set(-tableWidth/2-.3,0,0);
@@ -111,13 +110,16 @@ async function openTableFlip(catching=false,chosenMood=null) {
  const pieces=[],loader=new T.TextureLoader();
  rows.forEach((row,tier)=>{
    const layer=group(table);
-   const rowIndex=Math.floor(tier/columns);
-   const rowSize=Math.min(columns,rows.length-rowIndex*columns);
-   layer.position.set((tier%columns-(rowSize-1)/2)*3*trayScale,1.2,(rowIndex-(depth-1)/2)*2.9*trayScale);
-   layer.scale.setScalar(trayScale);
+   // 一の重 is on top, with each lacquered base resting on the rim below.
+   const level=rows.length-1-tier;
+   const baseY=1.2+level*.39;
+   layer.position.y=baseY;
+   layers.push({layer,level,baseY});
    const y=0;
    box(layer,0,y,0,2.85,.15,2.65,0x651b0f);
    for(const sign of [-1,1]){
+     box(layer,sign*1.427,y+.26,0,.025,.025,2.65,0xc89850);
+     box(layer,0,y+.26,sign*1.322,2.86,.025,.025,0xc89850);
      box(layer,sign*1.39,y+.14,0,.09,.34,2.65,0x9b3022);
      box(layer,0,y+.14,sign*1.28,2.85,.34,.09,0x9b3022);
    }
@@ -175,7 +177,40 @@ async function openTableFlip(catching=false,chosenMood=null) {
    camera.position.lerp(shift.set(x,y+dist*.23,dist),blend);
    camera.lookAt(controls.target);
  }
+ const ink=document.createElement('div');
+ ink.className='flip-ink';ink.hidden=true;ink.setAttribute('aria-hidden','true');
+ const rays=Array.from({length:54},(_,i)=>{
+   const length=17+(i*11)%17;
+   return '<path transform="rotate('+i*360/54+' 50 50)" d="M49 -22L'+(49.5+(i%3)*.6)+' '+(length-14)+'L52 -22Z"/>';
+ }).join('');
+ ink.innerHTML='<svg viewBox="0 0 100 100" preserveAspectRatio="none"><g>'+rays+'</g></svg><i></i><strong></strong>';
+ stage.append(ink);
+ const shout=ink.querySelector('strong'),ring=ink.querySelector('i'),lines=ink.querySelector('svg');
+ const projected=new T.Vector3(),reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+ let inkTime=Infinity;
+ function updateInk(dt){
+   if(ink.hidden)return;
+   inkTime+=dt;
+   if(inkTime>=1.1){ink.hidden=true;return}
+   if(phase==='flip'){
+     projected.set(0,1.8,0);grandpa.body.localToWorld(projected);projected.project(camera);
+     shout.style.left=T.MathUtils.clamp((projected.x+1)*50+6,23,77)+'%';
+     shout.style.top=T.MathUtils.clamp((1-projected.y)*50-8,16,76)+'%';
+     projected.set(0,1.55,0).project(camera);
+     ring.style.left=((1+projected.x)*50)+'%';ring.style.top=((1-projected.y)*50)+'%';
+   }
+   const hit=Math.max(0,inkTime-.32);
+   lines.style.opacity=reduceMotion?0:Math.max(0,.76-hit*1.45);
+   ring.style.opacity=reduceMotion||hit===0?0:Math.max(0,1-hit*2.5);
+   ring.style.transform='translate(-50%,-50%) scale('+(.12+hit*4)+')';
+   const pop=reduceMotion?1:1+.18*Math.sin(Math.min(1,inkTime/.26)*Math.PI);
+   shout.style.transform='translate(-50%,-65%) rotate(-7deg) scale('+pop+')';
+   ink.style.opacity=Math.min(1,(1.1-inkTime)*6);
+ }
  function beginFlip(isReplay){
+   inkTime=0;ink.hidden=false;
+   shout.textContent=catching?['ほいさっ！','そいやっ！','どっせーい！','天まで飛べぇ！'][moods.indexOf(condition)]:(power>21?'どっせーい！':'そりゃあっ！');
+   grandpa.mouth.scale.y=.10;
    replaying=isReplay;paused=false;flipTime=0;phase='flip';
    meter.hidden=true;launch.hidden=true;replay.hidden=true;pause.hidden=!isReplay;
    if(catching){controls.enabled=false}
@@ -189,6 +224,8 @@ async function openTableFlip(catching=false,chosenMood=null) {
    paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
  };
  function reset(){
+   ink.hidden=true;grandpa.mouth.scale.y=.03;
+   for(const {layer,baseY} of layers){layer.position.set(0,baseY,0);layer.rotation.z=0}
    phase=catching?'ready':'angle';controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    if(catching){
      stage.querySelector('.catch-track').hidden=true;
@@ -219,9 +256,8 @@ async function openTableFlip(catching=false,chosenMood=null) {
      scene.attach(p.mesh);p.origin=p.mesh.position.clone();
    }
    if(catching){
-     // A full three-tier meal reaches the mood's ceiling. Smaller servings retain most of its power.
-     const load=.92+.08*Math.min(1,(boost-1)/.64);
-     power=autoPower(pieces,angle*Math.PI/180,condition.range*load);
+     power=condition.power*boost;
+     angle=bestThrowAngle(pieces,power);
    }
    for(const p of pieces){
      Object.assign(p,throwVelocity(p,power,angle*Math.PI/180));
@@ -232,7 +268,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    if(catching){
      maxThrow=Math.max(...pieces.map(p=>p.vx*travelTime(p.drag,p.land)));
      catcher.start(condition);
-     status.textContent=condition.name+'の一投！　最長 '+maxThrow.toFixed(1)+' m';
+     status.textContent=condition.name+'の一投！　'+angle.toFixed(1)+'°・最長 '+maxThrow.toFixed(1)+' m';
    }
    burst(new T.Vector3(0,2,0),75);
  }
@@ -241,8 +277,8 @@ async function openTableFlip(catching=false,chosenMood=null) {
    for(const p of pieces){
      if(p.landed||(catching&&p.state!=='loose'))continue;
      const u=Math.min(elapsed,p.land),travel=travelTime(p.drag,u);
-     p.descending=u>=p.vy/9.81;p.distance=p.vx*travel;
-     p.mesh.position.set(p.origin.x+p.distance,p.origin.y+p.vy*u-4.905*u*u,p.origin.z+p.vz*travel);
+     p.descending=u>=p.peak;p.distance=p.vx*travel;
+     p.mesh.position.set(p.origin.x+p.distance,throwHeight(p.origin.y,p.vy,p.drag,u),p.origin.z+p.vz*travel);
      p.mesh.rotation.set(-1.1+u*(2+p.id%5),u*2,u*(1+p.id%3));
      p.trailPos.copyWithin(3,0,141);p.mesh.position.toArray(p.trailPos,0);p.samples=Math.min(48,p.samples+1);
      p.line.geometry.attributes.position.needsUpdate=true;p.line.geometry.setDrawRange(0,p.samples);
@@ -266,7 +302,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    const dt=Math.min(.05,(now-last)/1000||0);last=now;
    if(phase==='ready'||phase==='angle'||phase==='power')grandpa.body.rotation.z=Math.sin(now*.003*condition.pace)*condition.sway*.25;
    if(phase==='ready'&&now-started>=950){
-     angle=37+Math.random()*14;beginFlip(false);status.textContent=condition.name+'のおじいちゃん、振りかぶった！';
+     beginFlip(false);status.textContent=condition.name+'のおじいちゃん、振りかぶった！';
    }
    if(phase==='angle'||phase==='power'){
      const value=wave(now);meter.value=value*100;
@@ -275,6 +311,11 @@ async function openTableFlip(catching=false,chosenMood=null) {
      target.set(0,1,0);
    }else if(phase==='flip'){
      flipTime+=paused?0:dt;const f=Math.min(1,flipTime/.38);table.rotation.z=-.68*f*f;grandpa.body.rotation.z=-.42*Math.sin(f*Math.PI/2);if(!catching)target.set(0,1.4,0);
+     for(const {level,baseY,layer} of layers){
+       layer.position.x=level*.32*f*f;
+       layer.position.y=baseY+level*.16*f*f;
+       layer.rotation.z=level*.10*f;
+     }
      if(f===1)release();
    }else if(phase==='catch'){
      table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45);catcher.tick(dt);frameCatch(dt);
@@ -286,6 +327,8 @@ async function openTableFlip(catching=false,chosenMood=null) {
      shift.copy(target).sub(controls.target).multiplyScalar(1-Math.exp(-dt*9));
      controls.target.add(shift);camera.position.add(shift);controls.update();
    }
+   if(!paused)updateInk(dt);
+   if(ink.hidden)grandpa.mouth.scale.y=.03;
    renderer.render(scene,camera);frame=requestAnimationFrame(draw);
  }
  camera.position.copy(initialView).multiplyScalar(Math.max(1,(tableWidth+1.6)/(6.6*camera.aspect)));reset();last=performance.now();frame=requestAnimationFrame(draw);
