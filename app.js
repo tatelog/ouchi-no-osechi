@@ -223,6 +223,7 @@ function result(){
  const gallery=el.querySelector('.all-tiers');gallery.dataset.count=d.tiers.length;
  d.tiers.forEach((row,t)=>{const figure=document.createElement('figure'),label=document.createElement('figcaption');label.textContent=tierNames[t];figure.append(label,board(t,false));gallery.append(figure)});
  el.querySelector('.actions').append(button('詰め方を変える',()=>{d.recordId=crypto.randomUUID();d.phase='edit';render()}),button('Xで投稿',shareMenu,'primary'),button('新しく作る',()=>ask('このモードのお重を作り直す？',[['戻る',()=>{}],['新しく作る',()=>{state.drafts[state.mode]=fresh(state.mode);filter=0;render()}]])));
+ el.querySelector('.actions').append(button('台無しにする',openTableFlip));
  content.append(el)
 }
 function shareMenu(){
