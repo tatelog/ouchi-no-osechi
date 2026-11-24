@@ -74,8 +74,8 @@ export function bestThrowAngle(pieces,power){
  return bestAngle*180/Math.PI;
 }
 
-export function catchingGame({T,surface,pieces,status,grandma,track,onFinish}){
- let active=false,t=0,desired=0,eaten=0,chew=0,settings,extent,cleanup;
+export function catchingGame({T,surface,pieces,status,grandma,track,say,onFinish}){
+ let active=false,t=0,desired=0,eaten=0,chew=0,settings,extent,missed,nextComplaint;
  let drag=null;
  const keys=new Set(),point=new T.Vector3(),body=grandma.body;
  const ctx=track.getContext('2d');
@@ -112,14 +112,15 @@ export function catchingGame({T,surface,pieces,status,grandma,track,onFinish}){
  }
  return {
    start(mood){
-     active=true;cleanup=false;settings=mood;t=0;eaten=0;chew=0;drag=null;keys.clear();desired=0;
+     active=true;missed=0;nextComplaint=0;settings=mood;t=0;eaten=0;chew=0;drag=null;keys.clear();desired=0;
      body.position.set(0,0,1.8);
      for(const p of pieces){
        p.state='loose';p.dest=p.origin.x+p.vx*travelTime(p.drag,p.land);p.from=new T.Vector3();
      }
      extent=Math.ceil((Math.max(...pieces.map(p=>p.dest))+2)/5)*5;
      track.hidden=false;drawTrack();
-     status.textContent='着地点をタップしてダッシュ！';
+     say(['また始まったよ！','あたしは皿じゃないよ！','誰が作ったと思ってんだい！','正月早々、何すんだい！'][moods.indexOf(mood)]);
+     status.textContent='地面に落ちる前にキャッチ！';
    },
    tick(dt){
      if(!active)return;
@@ -142,6 +143,15 @@ export function catchingGame({T,surface,pieces,status,grandma,track,onFinish}){
      grandma.mouth.scale.y=.035+chew*.15;
      for(const p of pieces){
        if(p.state==='loose'){
+         if(p.landed){
+           p.state='missed';missed++;
+           if(t>=nextComplaint){
+             say(['ああっ、もったいない！','その手はお箸に使いな！','畳に食べさせてどうすんの！'][(missed-1)%3]);
+             nextComplaint=t+1.35;
+           }
+           status.textContent=names[p.id]+'が落ちた！　食べた '+eaten+'品・落とした '+missed+'品';
+           continue;
+         }
          const {x,y}=p.mesh.position;
          if(p.descending && y<=1.65 && Math.abs(p.mesh.position.z-body.position.z)<=1 && x>=Math.min(prev,body.position.x)-settings.reach && x<=Math.max(prev,body.position.x)+settings.reach){
            p.state='eating';p.bite=t;p.from.copy(p.mesh.position);eaten++;chew=.42;
@@ -157,12 +167,10 @@ export function catchingGame({T,surface,pieces,status,grandma,track,onFinish}){
        }
      }
      drawTrack();
-     if(!cleanup&&pieces.every(p=>p.landed||p.state!=='loose')){
-       cleanup=true;
-       if(eaten<pieces.length)status.textContent='あと'+(pieces.length-eaten)+'品。赤い印まで走って拾おう！';
-     }
-     if(pieces.every(p=>p.state==='done')){
-       active=false;grandma.mouth.scale.y=.035;onFinish(eaten);
+     if(pieces.every(p=>p.state==='done'||p.state==='missed')){
+       active=false;grandma.mouth.scale.y=.035;
+       say(missed?'来年は座って食べるよ！':'全部食べたよ。次はお皿でおくれ！');
+       onFinish(eaten,missed);
      }
    }
  };

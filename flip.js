@@ -6,7 +6,7 @@ function chooseGrandpaMood(moods,onSelect){
 async function openTableFlip(catching=false,chosenMood=null) {
  if(catching&&!chosenMood){
    try{
-     const {moods}=await import('./catch.js?v=3');
+     const {moods}=await import('./catch.js?v=4');
      chooseGrandpaMood(moods,mood=>openTableFlip(true,mood));
    }catch{notice('コンディションを読み込めませんでした。もう一度お試しください')}
    return;
@@ -19,7 +19,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
  if(catching){
    game.querySelector('h2').textContent='おばあちゃん、いただきます！';
    game.setAttribute('aria-label','お粗末にしない');
-   game.querySelector('small').textContent='着地点の印をタップしてダッシュ。ドラッグ・左右キーでも移動できます';
+   game.querySelector('small').textContent='印をタップして、落ちる前にキャッチ！　ドラッグ・左右キーでも移動できます';
    const course=document.createElement('canvas');
    course.className='catch-track';course.width=640;course.height=48;course.hidden=true;
    course.setAttribute('aria-label','回収コース。印は具材の着地点、紫はおばあちゃん');
@@ -46,7 +46,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=3'),import('./throw-overlay.js')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=4'),import('./throw-overlay.js')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -161,9 +161,24 @@ async function openTableFlip(catching=false,chosenMood=null) {
  const target=new T.Vector3(), shift=new T.Vector3();
  let lastShot, replaying=false, paused=false, flipTime=0;
  let maxThrow=0;
- const catcher=catching?catchingGame({T,surface,pieces,status,grandma,track:stage.querySelector(".catch-track"),onFinish:count=>{
+ const grandmaSpeech=document.createElement('span');
+ grandmaSpeech.className='grandma-speech';grandmaSpeech.hidden=true;
+ if(catching)stage.append(grandmaSpeech);
+ let speechTime=0;
+ function say(words){
+   grandmaSpeech.textContent=words;grandmaSpeech.hidden=false;speechTime=2;
+ }
+ function positionSpeech(dt){
+   if(grandmaSpeech.hidden)return;
+   speechTime-=dt;
+   if(speechTime<=0){grandmaSpeech.hidden=true;return}
+   projected.set(0,1.7,0);grandma.body.localToWorld(projected);projected.project(camera);
+   grandmaSpeech.style.left=T.MathUtils.clamp((projected.x+1)*50,28,72)+'%';
+   grandmaSpeech.style.top=T.MathUtils.clamp((1-projected.y)*50,22,81)+'%';
+ }
+ const catcher=catching?catchingGame({T,surface,pieces,status,grandma,say,track:stage.querySelector(".catch-track"),onFinish:(count,missed)=>{
    phase='result';controls.enabled=true;launch.hidden=false;launch.textContent='もう一度遊ぶ';
-   status.textContent='ごちそうさま！　'+rows.length+'段のおせち、'+count+'品を全部食べました。最長 '+maxThrow.toFixed(1)+' m';
+   status.textContent=(missed?'食べた '+count+'品・落とした '+missed+'品':'ごちそうさま！　全'+count+'品を完食')+'　最長 '+maxThrow.toFixed(1)+' m';
  }}):null;
  function frameCatch(dt){
    const pos=grandma.body.position;
@@ -225,7 +240,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
  };
  function reset(){
-   overlay.clear();angle=undefined;ink.hidden=true;grandpa.mouth.scale.y=.03;
+   grandmaSpeech.hidden=true;overlay.clear();angle=undefined;ink.hidden=true;grandpa.mouth.scale.y=.03;
    for(const {layer,baseY} of layers){layer.position.set(0,baseY,0);layer.rotation.z=0}
    phase=catching?'ready':'angle';controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    if(catching){
@@ -331,6 +346,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    if(!paused)updateInk(dt);
    if(ink.hidden)grandpa.mouth.scale.y=.03;
    renderer.render(scene,camera);
+   if(catching)positionSpeech(dt);
    const shownAngle=phase==='angle'?18+54*wave(now):angle;
    overlay.draw(paused?0:dt,shownAngle,phase==='angle'||phase==='power',1.45+(rows.length-1)*.39,phase==='power'?wave(now):null);
    frame=requestAnimationFrame(draw);
