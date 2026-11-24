@@ -219,10 +219,11 @@ function pauseMenu(){const d=draft(),t=d.tier,opts=[];if(d.seen[t].length<questi
 function finish(){const d=draft();if(!d.tiers.some(r=>r.some(i=>i!=null))){notice('まず一品、選んでください');return}d.phase='done';selected=pending=null;render()}
 function result(){
  const d=draft(),el=document.createElement('section');el.className='result overview';
- el.innerHTML='<h2>おうちのおせち、完成</h2><div class="all-tiers"></div><div class="actions"></div>';
+ el.innerHTML='<div class="result-heading"><h2>おうちのおせち、完成</h2></div><div class="all-tiers"></div><div class="actions"></div>';
+ el.querySelector('.result-heading').append(button('Xで投稿',shareMenu,'primary'));
  const gallery=el.querySelector('.all-tiers');gallery.dataset.count=d.tiers.length;
  d.tiers.forEach((row,t)=>{const figure=document.createElement('figure'),label=document.createElement('figcaption');label.textContent=tierNames[t];figure.append(label,board(t,false));gallery.append(figure)});
- el.querySelector('.actions').append(button('詰め方を変える',()=>{d.recordId=crypto.randomUUID();d.phase='edit';render()}),button('Xで投稿',shareMenu,'primary'),button('新しく作る',()=>ask('このモードのお重を作り直す？',[['戻る',()=>{}],['新しく作る',()=>{state.drafts[state.mode]=fresh(state.mode);filter=0;render()}]])));
+ el.querySelector('.actions').append(button('詰め方を変える',()=>{d.recordId=crypto.randomUUID();d.phase='edit';render()}),button('新しく作る',()=>ask('このモードのお重を作り直す？',[['戻る',()=>{}],['新しく作る',()=>{state.drafts[state.mode]=fresh(state.mode);filter=0;render()}]])));
  el.querySelector('.actions').append(button('お粗末にする',()=>openTableFlip(false)),button('お粗末にしない',()=>openTableFlip(true)));
  content.append(el)
 }

@@ -141,3 +141,7 @@ dialog.flip-game[open]{
 .flip-ink strong::after{inset:4px;background:#fff7d7;z-index:-1}
 .flip-game .flip-stage canvas.throw-overlay{pointer-events:none;z-index:1}.flip-game .flip-stage canvas.catch-track{z-index:3}
 .grandma-speech{position:absolute;z-index:4;pointer-events:none;max-width:52%;width:max-content;padding:.4em .7em;border:2px solid #5b3430;border-radius:1em;background:#fff2df;color:#673d33;font:bold clamp(15px,3vmin,23px)/1.3 klee,serif;transform:translate(-50%,-110%);box-shadow:2px 2px #7d49494a}.grandma-speech::after{content:"";position:absolute;bottom:-6px;left:48%;width:8px;height:8px;background:#fff2df;border:solid #5b3430;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.result-heading{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 12px;flex:none;width:100%}
+.result-heading button{min-height:44px;padding:6px 16px;white-space:nowrap;line-height:1.2}
+.overview .result-heading{position:sticky;top:0;z-index:1}
+@media(orientation:landscape) and (max-height:540px){.flip-game>.result-heading{grid-column:2}}

@@ -15,7 +15,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
  const game = document.createElement('dialog');
  game.className = 'flip-game';
  game.setAttribute('aria-label','ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-share primary" hidden>Xで投稿</button><button class="flip-exit">お重に戻る</button></div>';
+ game.innerHTML = '<div class="result-heading"><h2>ちゃぶ台返し</h2><button class="flip-share primary" hidden>Xで投稿</button></div><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
  if(catching){
    game.querySelector('h2').textContent='おばあちゃん、いただきます！';
    game.setAttribute('aria-label','お粗末にしない');
