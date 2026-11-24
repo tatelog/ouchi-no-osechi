@@ -1,87 +1,153 @@
-function openTableFlip() {
- const d = draft();
- const dishes = d.tiers.flat().filter(id => id != null);
- if (!dishes.length) return;
+async function openTableFlip() {
+ const meal = draft();
  const game = document.createElement('dialog');
  game.className = 'flip-game';
- game.setAttribute('aria-label', 'ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><canvas width="640" height="330" aria-hidden="true"></canvas><p role="status"></p><meter min="0" max="100" aria-label="タイミング"></meter><div><button class="primary flip-launch"></button><button class="flip-exit">お重に戻る</button></div>';
+ game.setAttribute('aria-label','ちゃぶ台返し');
+ game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-exit">お重に戻る</button></div>';
  document.body.append(game);
- const canvas = game.querySelector('canvas'), ctx = canvas.getContext('2d');
- const status = game.querySelector('p'), meter = game.querySelector('meter'), launch = game.querySelector('.flip-launch');
- const images = new Map();
- for (const id of new Set(dishes)) {
-   const img = new Image();
-   img.src = id === 0 ? './assets/art/'+(d.kam===3?'white':'pink')+'-slice.png' : foodPath(id);
-   images.set(id,img);
+ game.showModal();
+ const stage=game.querySelector('.flip-stage'), status=game.querySelector('p'), launch=game.querySelector('.flip-launch'), meter=game.querySelector('meter');
+ game.querySelector('.flip-exit').onclick=()=>game.close();
+ let renderer, frame, scene;
+ const textures=new Map();
+ game.addEventListener('close',()=>{
+   cancelAnimationFrame(frame);
+   scene?.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});
+   textures.forEach(tex=>tex.dispose());
+   renderer?.dispose();renderer?.forceContextLoss();game.remove();
+ },{once:true});
+ try {
+ const T=await import('./assets/vendor/three.module.js');
+ if(!game.open)return;
+ renderer=new T.WebGLRenderer({antialias:true,alpha:false});
+ stage.append(renderer.domElement);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+ renderer.setSize(680,480,false);
+ scene=new T.Scene();scene.background=new T.Color(0xffe2b4);
+ scene.fog=new T.FogExp2(0xffdfb1,.007);
+ const camera=new T.PerspectiveCamera(40,680/480,.05,500);
+ const light=new T.DirectionalLight(0xffefcc,2.8);light.position.set(-5,10,6);scene.add(light,new T.HemisphereLight(0xfff6e0,0xe2ae87,2));
+ const group=parent=>{const g=new T.Group();parent.add(g);return g};
+ function box(parent,x,y,z,w,h,l,color){
+   const mesh=new T.Mesh(new T.BoxGeometry(w,h,l),new T.MeshStandardMaterial({color,roughness:.4}));
+   mesh.position.set(x,y,z);parent.add(mesh);return mesh;
  }
- let phase, start, angle, power, pieces, frame;
- let best = 0;
- try { best = Number(localStorage.getItem('osechi-flip-best')) || 0 } catch {}
- function reset() {
-   phase='angle'; start=performance.now(); pieces=[]; angle=45; power=0;
-   meter.hidden=false;launch.hidden=false;launch.textContent='角度を決める';
-   status.textContent='飛ばす角度を狙ってタップ'+(best?'　自己ベスト '+best.toFixed(1)+' m':'');
-   frame=requestAnimationFrame(draw);
+ box(scene,90,-.15,0,450,.3,130,0xb7af78);
+ for(let m=0;m<=220;m+=5)box(scene,m,.012,0,.055,.02,m%10===0?9:5,0xf6e3af);
+ const table=group(scene);
+ box(table,0,1.02,0,3.8,.18,3.2,0x84412b);
+ for(const x of [-1.5,1.5])for(const z of [-1.2,1.2])box(table,x,.48,z,.19,.96,.19,0x653321);
+ const pieces=[],loader=new T.TextureLoader();
+ const rows=meal.tiers.filter(row=>row.some(id=>id!=null));
+ rows.forEach((row,tier)=>{
+   const y=1.17+tier*.42;
+   box(table,0,y,0,2.85,.15,2.65,0x651b0f);
+   for(const sign of [-1,1]){
+     box(table,sign*1.39,y+.14,0,.09,.34,2.65,0x9b3022);
+     box(table,0,y+.14,sign*1.28,2.85,.34,.09,0x9b3022);
+   }
+   const layout=arrangeTray(row);
+   row.forEach((id,i)=>{
+     if(id==null)return;
+     const r=layout[i],path=id===0?'./assets/art/'+(meal.kam===3?'white':'pink')+'-slice.png':foodPath(id);
+     if(!textures.has(path)){
+       const tex=loader.load(path,()=>{},undefined,()=>{});
+       tex.colorSpace=T.SRGBColorSpace;textures.set(path,tex);
+
+     }
+     const tex=textures.get(path);
+     const mesh=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:tex,transparent:true,alphaTest:.08,side:T.DoubleSide}));
+     mesh.position.set(((r.x+r.w/2)/100-.5)*2.64,y+.19+i*.004,((r.y+r.h/2)/100-.5)*2.44);
+     mesh.rotation.x=-Math.PI/2;mesh.scale.set(r.w*.026,r.h*.024,1);table.add(mesh);
+     const trailPos=new Float32Array(48*3),geo=new T.BufferGeometry();
+     geo.setAttribute('position',new T.BufferAttribute(trailPos,3));geo.setDrawRange(0,0);
+     const line=new T.Line(geo,new T.LineBasicMaterial({color:new T.Color().setHSL((id*.123)%1,.84,.53),transparent:true,opacity:.8}));
+     line.frustumCulled=false;scene.add(line);
+     pieces.push({id,mesh,home:mesh.position.clone(),scale:mesh.scale.clone(),line,trailPos});
+   });
+ });
+ // Confetti bursts use one shared point cloud, including simultaneous landings.
+ const capacity=450, sparks=[],coords=new Float32Array(capacity*3),colors=new Float32Array(capacity*3);
+ const particles=new T.BufferGeometry();
+ particles.setAttribute('position',new T.BufferAttribute(coords,3));particles.setAttribute('color',new T.BufferAttribute(colors,3));
+ const cloud=new T.Points(particles,new T.PointsMaterial({size:.12,vertexColors:true,transparent:true,opacity:.92}));
+ cloud.frustumCulled=false;scene.add(cloud);
+ function burst(pos,count){
+   for(let i=0;i<count;i++)sparks.push({p:pos.clone(),v:new T.Vector3((Math.random()-.5)*6,1+Math.random()*5,(Math.random()-.5)*6),life:1,color:new T.Color().setHSL(Math.random()*.16,.94,.55)});
+   if(sparks.length>capacity)sparks.splice(0,sparks.length-capacity);
  }
- function timing(now) {return (1-Math.cos((now-start)/370))/2}
- function aimed(now) {return 15+60*timing(now)}
- function force(now) {return 8+19*timing(now)}
+ const boost=1+.11*(rows.length-1)+.021*(pieces.length-1);
+ let phase,started,angle,power,elapsed,last,best=0,shake=0;
+ try{best=Number(localStorage.getItem('osechi-flip-3d-best'))||0}catch{}
+ const wave=time=>(1-Math.cos((time-started)/380))/2;
+ const look=new T.Vector3(), target=new T.Vector3(), eye=new T.Vector3();
+ function reset(){
+   phase='angle';started=performance.now();elapsed=0;shake=0;sparks.length=0;table.rotation.z=0;
+   camera.position.set(4.5,7,7.4);look.set(0,1,0);
+   for(const p of pieces){table.add(p.mesh);p.mesh.position.copy(p.home);p.mesh.scale.copy(p.scale);p.mesh.rotation.set(-Math.PI/2,0,0);p.line.geometry.setDrawRange(0,0);p.landed=false;p.distance=0}
+   meter.hidden=false;launch.disabled=false;launch.hidden=false;launch.textContent='角度を決める';
+   status.textContent=rows.length+'段・'+pieces.length+'品　飛ばす角度を狙ってタップ';
+ }
  launch.onclick=()=>{
    const now=performance.now();
    if(phase==='result'){reset();return}
-   if(phase==='angle'){angle=aimed(now);phase='power';start=now;status.textContent='力をためて、タイミングよく返そう！';launch.textContent='ちゃぶ台を返す！';return}
-   if(phase!=='power')return;
-   power=force(now);phase='flight';start=now;launch.hidden=true;meter.hidden=true;
-   status.textContent='具材が飛んでいく！';
-   pieces=dishes.map(id=>{
-     const radians=(angle+(Math.random()-.5)*12)*Math.PI/180;
-     const speed=power*(.85+.3*Math.random());
-     const vx=speed*Math.cos(radians), vy=speed*Math.sin(radians);
-     const land=(vy+Math.sqrt(vy*vy+2*9.81*1.6))/9.81;
-     return {id,vx,vy,land,distance:land*vx};
-   });
+   if(phase==='angle'){angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
+   if(phase==='power'){power=(8+15*wave(now))*boost;phase='flip';started=now;meter.hidden=true;launch.hidden=true;status.textContent='そりゃっ！'}
  };
- game.querySelector('.flip-exit').onclick=()=>game.close();
- game.addEventListener('close',()=>{cancelAnimationFrame(frame);game.remove()},{once:true});
- function photo(id,x,y,size,rotation) {
-   const img=images.get(id);
-   if(!img.naturalWidth)return;
-   const scale=size/Math.max(img.naturalWidth,img.naturalHeight);
-   ctx.save();ctx.translate(x,y);ctx.rotate(rotation);
-   const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
-   ctx.drawImage(img,-w/2,-h/2,w,h);ctx.restore();
- }
- function draw(now) {
-   if(!game.open)return;
-   const flying=phase==='flight';
-   const t=flying?(now-start)/650:0;
-   const lead=flying?Math.max(...pieces.map(p=>p.vx*Math.min(t,p.land))):0;
-   const scale=Math.min(15,510/Math.max(1,lead),flying?215/Math.max(1,...pieces.map(p=>1.6+p.vy*p.vy/19.62)):15);
-   const ground=271;
-   ctx.fillStyle='#f9edce';ctx.fillRect(0,0,640,330);
-   ctx.fillStyle='#c5bf86';ctx.fillRect(0,ground,640,59);
-   ctx.fillStyle='#5a4833';ctx.font='18px serif';
-   for(let m=0;60+m*scale<625;m+=10){const x=60+m*scale;ctx.fillRect(x,ground,2,10);ctx.fillText(m+' m',x-8,ground+34)}
-   ctx.save();ctx.translate(60,ground-24);ctx.rotate(flying?-Math.min(t*5,2.2):0);
-   ctx.fillStyle='#824321';ctx.fillRect(-40,-10,100,11);ctx.fillRect(-30,0,8,24);ctx.fillRect(42,0,8,24);ctx.restore();
-   if(flying){
-     for(const p of pieces){const u=Math.min(t,p.land);photo(p.id,60+p.vx*u*scale,ground-14-Math.max(0,1.6+p.vy*u-4.905*u*u)*scale,45,u*3)}
-     if(pieces.every(p=>t>=p.land)){
-       const winner=pieces.reduce((a,b)=>a.distance>=b.distance?a:b);
-       best=Math.max(best,winner.distance);
-       try{localStorage.setItem('osechi-flip-best',String(best))}catch{}
-       status.textContent='最遠は'+names[winner.id]+'！ '+winner.distance.toFixed(1)+' m（自己ベスト '+best.toFixed(1)+' m）';
-       phase='result';launch.hidden=false;launch.textContent='もう一度返す';return;
-     }
-   }else{
-     dishes.forEach((id,i)=>photo(id,33+(i%6)*11,ground-45-Math.floor(i/6)*6,33,0));
-     const deg=phase==='angle'?aimed(now):angle;
-     const rad=deg*Math.PI/180;
-     ctx.strokeStyle='#a43124';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(80,ground-55);ctx.lineTo(80+75*Math.cos(rad),ground-55-75*Math.sin(rad));ctx.stroke();
-     meter.value=100*timing(now);ctx.fillText(phase==='angle'?Math.round(deg)+'°':'力 '+Math.round(meter.value)+'%',115,85);
+ function release(){
+   table.updateMatrixWorld(true);
+   for(const p of pieces){
+     scene.attach(p.mesh);p.origin=p.mesh.position.clone();
+     // Each dish has a repeatable launch response and air resistance.
+     const response=.86+((p.id*37+11)%47)/100, drag=.035+((p.id*19+5)%29)/110;
+     const radians=angle*Math.PI/180;
+     p.drag=drag;p.vx=power*response*Math.cos(radians);p.vy=power*response*Math.sin(radians);
+     p.vz=Math.sin(p.id*2.3)*1.7;p.land=(p.vy+Math.sqrt(p.vy*p.vy+19.62*Math.max(.01,p.origin.y-.09)))/9.81;
+     p.trailPos.fill(0);p.samples=0;
    }
-   frame=requestAnimationFrame(draw);
+   phase='flight';elapsed=0;shake=.25;burst(new T.Vector3(0,2,0),75);
  }
- game.showModal();reset();
+ function flight(dt){
+   elapsed+=dt;
+   for(const p of pieces){
+     if(p.landed)continue;
+     const u=Math.min(elapsed,p.land),travel=-Math.expm1(-p.drag*u)/p.drag;
+     p.distance=p.vx*travel;
+     p.mesh.position.set(p.origin.x+p.distance,p.origin.y+p.vy*u-4.905*u*u,p.origin.z+p.vz*travel);
+     p.mesh.rotation.set(-1.1+u*(2+p.id%5),u*2,u*(1+p.id%3));
+     p.trailPos.copyWithin(3,0,141);p.mesh.position.toArray(p.trailPos,0);p.samples=Math.min(48,p.samples+1);
+     p.line.geometry.attributes.position.needsUpdate=true;p.line.geometry.setDrawRange(0,p.samples);
+     if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;burst(p.mesh.position,16)}
+   }
+   const lead=pieces.reduce((a,b)=>a.distance>b.distance?a:b);
+   target.copy(lead.mesh.position);eye.copy(target).add(new T.Vector3(3,3.5,8));
+   if(pieces.every(p=>p.landed)){
+     phase='result';best=Math.max(best,lead.distance);
+     try{localStorage.setItem('osechi-flip-3d-best',best)}catch{}
+     status.textContent='最遠は'+names[lead.id]+'！ '+lead.distance.toFixed(1)+' m（自己ベスト '+best.toFixed(1)+' m）';
+     launch.hidden=false;launch.textContent='もう一度返す';burst(target,60);
+   }else status.textContent=names[lead.id]+'　'+lead.distance.toFixed(1)+' m';
+ }
+ function draw(now){
+   if(!game.open)return;
+   const dt=Math.min(.05,(now-last)/1000||0);last=now;
+   if(phase==='angle'||phase==='power'){
+     const value=wave(now);meter.value=value*100;
+     if(phase==='power')table.rotation.z=Math.sin(now*.032)*value*.035;
+     status.textContent=rows.length+'段・'+pieces.length+'品　'+(phase==='angle'?'角度 '+Math.round(18+54*value)+'°':'角度 '+Math.round(angle)+'°　力 '+Math.round(value*100)+'％');
+     target.set(0,1,0);eye.set(4.5,7,7.4);
+   }else if(phase==='flip'){
+     const f=Math.min(1,(now-started)/380);table.rotation.z=-.68*f*f;target.set(0,1.4,0);eye.set(3.7,4,6.5);
+     if(f===1)release();
+   }else if(phase==='flight'){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
+   for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
+   sparks.forEach((s,i)=>{s.p.toArray(coords,i*3);s.color.toArray(colors,i*3)});
+   particles.attributes.position.needsUpdate=true;particles.attributes.color.needsUpdate=true;particles.setDrawRange(0,sparks.length);
+   const blend=1-Math.exp(-dt*7);look.lerp(target,blend);camera.position.lerp(eye,blend);
+   shake=Math.max(0,shake-dt);camera.lookAt(look.x,look.y+Math.sin(now*.08)*shake*.4,look.z);
+   renderer.render(scene,camera);frame=requestAnimationFrame(draw);
+ }
+ reset();last=performance.now();frame=requestAnimationFrame(draw);
+ }catch(error){status.textContent='3D画面を開けませんでした。WebGL 2対応のブラウザでお試しください。';launch.hidden=true;console.error(error)}
 }
+
