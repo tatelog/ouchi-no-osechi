@@ -1,8 +1,8 @@
 export const moods=[
- {name:'ほろよい',pace:1,interval:1.1,air:2.4,reach:.85,sway:.12},
- {name:'酔っ払い',pace:1.25,interval:.85,air:2.1,reach:.76,sway:.32},
- {name:'泥酔',pace:1.55,interval:.67,air:1.85,reach:.69,sway:.55},
- {name:'やけくそ',pace:1.9,interval:.47,air:1.65,reach:.62,sway:.8}
+ {name:'ほろよい',pace:1,range:20,sprint:22,reach:.85,sway:.12},
+ {name:'酔っ払い',pace:1.25,range:40,sprint:34,reach:.76,sway:.32},
+ {name:'泥酔',pace:1.55,range:68,sprint:49,reach:.69,sway:.55},
+ {name:'やけくそ',pace:1.9,range:100,sprint:70,reach:.62,sway:.8}
 ];
 
 export function elder(T,scene,grandma){
@@ -34,75 +34,117 @@ export function elder(T,scene,grandma){
  return {body,mouth};
 }
 
-export function catchingGame({T,scene,camera,surface,pieces,status,grandma,onFinish}){
- let active=false,cleanup=false,t=0,desired=0,eaten=0,chew=0,settings;
- let drag=null;
- const keys=new Set(), ray=new T.Raycaster(), point=new T.Vector3();
- const lane=new T.Plane(new T.Vector3(0,0,1),-1.8);
- function steer(e){
-   const r=surface.getBoundingClientRect();
-   ray.setFromCamera({x:2*(e.clientX-r.left)/r.width-1,y:0},camera);
-   if(ray.ray.intersectPlane(lane,point))desired=T.MathUtils.clamp(point.x,-3.8,3.8);
+// Identical launch and air resistance for manual throws and automatic throws.
+export function throwVelocity(p,power,radians){
+ const response=.86+((p.id*37+11)%47)/100;
+ const drag=.035+((p.id*19+5)%29)/110;
+ const vx=power*response*Math.cos(radians),vy=power*response*Math.sin(radians);
+ const land=(vy+Math.sqrt(vy*vy+19.62*Math.max(.01,p.origin.y-.09)))/9.81;
+ return {vx,vy,drag,land,vz:Math.sin(p.id*2.3)*1.7};
+}
+export function travelTime(drag,t){return -Math.expm1(-drag*t)/drag}
+export function autoPower(pieces,radians,range){
+ function farthest(power){
+   return Math.max(...pieces.map(p=>{
+     const v=throwVelocity(p,power,radians);
+     return v.vx*travelTime(v.drag,v.land);
+   }));
  }
- surface.addEventListener('pointerdown',e=>{
-   if(!active||drag!==null)return;
-   drag=e.pointerId;surface.setPointerCapture(drag);steer(e);
- });
- surface.addEventListener('pointermove',e=>{if(active&&e.pointerId===drag)steer(e)});
- function end(e){if(e.pointerId===drag)drag=null}
- surface.addEventListener('pointerup',end);surface.addEventListener('pointercancel',end);
+ let low=0,high=32;
+ while(farthest(high)<range)high*=2;
+ for(let i=0;i<28;i++){
+   const mid=(low+high)/2;
+   if(farthest(mid)<range)low=mid;else high=mid;
+ }
+ return (low+high)/2;
+}
+
+export function catchingGame({T,surface,pieces,status,grandma,track,onFinish}){
+ let active=false,t=0,desired=0,eaten=0,chew=0,settings,extent,cleanup;
+ let drag=null;
+ const keys=new Set(),point=new T.Vector3(),body=grandma.body;
+ const ctx=track.getContext('2d');
+ function steer(e){
+   const r=e.currentTarget.getBoundingClientRect();
+   desired=T.MathUtils.clamp((e.clientX-r.left)/r.width,0,1)*extent;
+ }
+ for(const el of [surface,track]){
+   el.addEventListener('pointerdown',e=>{
+     if(!active||drag!==null)return;
+     drag=e.pointerId;el.setPointerCapture(drag);steer(e);
+   });
+   el.addEventListener('pointermove',e=>{if(active&&e.pointerId===drag)steer(e)});
+   for(const type of ['pointerup','pointercancel'])el.addEventListener(type,e=>{if(e.pointerId===drag)drag=null});
+ }
  const dialog=surface.closest('dialog');
  function key(e,down){
    if(!active||!['ArrowLeft','ArrowRight'].includes(e.key))return;
    e.preventDefault();if(down)keys.add(e.key);else keys.delete(e.key);
  }
  dialog.addEventListener('keydown',e=>key(e,true));dialog.addEventListener('keyup',e=>key(e,false));
- function eat(p){
-   p.state='eating';p.bite=t;p.from.copy(p.mesh.position);eaten++;chew=.42;
-   status.textContent=names[p.id]+'をぱくり！　'+eaten+'／'+pieces.length+'品';
+ function drawTrack(){
+   const w=track.width,h=track.height;
+   ctx.clearRect(0,0,w,h);ctx.fillStyle='#f9e9c8';ctx.fillRect(0,0,w,h);
+   ctx.fillStyle='#99734d';ctx.fillRect(0,h*.6,w,2);
+   for(const p of pieces){
+     if(p.state!=='loose')continue;
+     ctx.fillStyle=p.landed?'#a12e21':'#ac7732';
+     ctx.beginPath();ctx.arc(p.dest/extent*(w-10)+5,h*.42,4,0,Math.PI*2);ctx.fill();
+   }
+   ctx.fillStyle='#563765';ctx.fillRect(body.position.x/extent*(w-10)+2,h*.32,7,h*.54);
+   ctx.font='15px sans-serif';ctx.fillText('0 m',5,15);ctx.textAlign='right';
+   ctx.fillText(Math.round(extent)+' m',w-5,15);ctx.textAlign='left';
  }
  return {
    start(mood){
      active=true;cleanup=false;settings=mood;t=0;eaten=0;chew=0;drag=null;keys.clear();desired=0;
-     grandma.body.position.set(0,0,1.8);
-     // Mix tiers so every layer takes part from the first volley.
-     [...pieces].sort((a,b)=>a.slot-b.slot||a.tier-b.tier).forEach((p,i)=>{
-       p.state='waiting';p.delay=i*mood.interval;p.air=mood.air*(.94+Math.random()*.12);
-       p.dest=(Math.random()*2-1)*3.45;p.from=new T.Vector3();p.arc=(Math.random()*2-1)*mood.sway;
-     });
-     status.textContent='おばあちゃんを左右に動かそう　0／'+pieces.length+'品';
+     body.position.set(0,0,1.8);
+     for(const p of pieces){
+       p.state='loose';p.dest=p.origin.x+p.vx*travelTime(p.drag,p.land);p.from=new T.Vector3();
+     }
+     extent=Math.ceil((Math.max(...pieces.map(p=>p.dest))+2)/5)*5;
+     track.hidden=false;drawTrack();
+     status.textContent='着地点をタップしてダッシュ！';
    },
    tick(dt){
      if(!active)return;
      t+=dt;chew=Math.max(0,chew-dt);
-     desired=T.MathUtils.clamp(desired+dt*6*(Number(keys.has('ArrowRight'))-Number(keys.has('ArrowLeft'))),-3.8,3.8);
-     const body=grandma.body;
-     body.position.x=T.MathUtils.damp(body.position.x,desired,12,dt);
-     body.position.y=chew*.35;grandma.mouth.scale.y=.035+chew*.15;
+     const step=settings.sprint*dt;
+     desired=T.MathUtils.clamp(desired+step*(Number(keys.has('ArrowRight'))-Number(keys.has('ArrowLeft'))),0,extent);
+     const prev=body.position.x;
+     body.position.x+=T.MathUtils.clamp(desired-prev,-step,step);
+     // The player picks the distance. Grandma cuts toward the nearest dish in depth.
+     let nearest=null,gap=Infinity;
      for(const p of pieces){
-       if(p.state==='waiting'&&t>=p.delay){
-         scene.attach(p.mesh);p.origin=p.mesh.position.clone();p.state='air';
+       if(p.state!=='loose')continue;
+       const dx=Math.abs(p.mesh.position.x-body.position.x);
+       if(dx<gap){nearest=p;gap=dx}
+     }
+     if(nearest)body.position.z+=T.MathUtils.clamp(nearest.mesh.position.z-body.position.z,-step,step);
+     const running=Math.abs(prev-body.position.x)>.01;
+     body.position.y=running?Math.abs(Math.sin(t*24))*.2:chew*.35;
+     body.rotation.z=running?-.19*Math.sign(desired-prev):0;
+     grandma.mouth.scale.y=.035+chew*.15;
+     for(const p of pieces){
+       if(p.state==='loose'){
+         const {x,y}=p.mesh.position;
+         if(p.descending && y<=1.65 && Math.abs(p.mesh.position.z-body.position.z)<=1 && x>=Math.min(prev,body.position.x)-settings.reach && x<=Math.max(prev,body.position.x)+settings.reach){
+           p.state='eating';p.bite=t;p.from.copy(p.mesh.position);eaten++;chew=.42;
+           p.line.geometry.setDrawRange(0,0);
+           status.textContent=names[p.id]+'をぱくり！　'+eaten+'／'+pieces.length+'品';
+         }
        }
-       if(p.state==='air'){
-         const u=Math.min(1,(t-p.delay)/p.air);
-         p.mesh.position.set(T.MathUtils.lerp(p.origin.x,p.dest,u)+Math.sin(Math.PI*u)*p.arc,
-           T.MathUtils.lerp(p.origin.y,.16,u)+Math.sin(Math.PI*u)*(2.8+settings.sway),
-           T.MathUtils.lerp(p.origin.z,1.8,u));
-         p.mesh.rotation.set(-.55,u*4,u*5);
-         if(u>.78&&Math.abs(body.position.x-p.mesh.position.x)<settings.reach&&p.mesh.position.y<1.55)eat(p);
-         else if(u===1){p.state='ground';p.mesh.rotation.set(-1.25,0,0)}
-       }
-       if(cleanup&&p.state==='ground'&&Math.abs(body.position.x-p.dest)<settings.reach)eat(p);
        if(p.state==='eating'){
-         const u=Math.min(1,(t-p.bite)/.35);
-         p.mesh.position.lerpVectors(p.from,point.set(body.position.x,body.position.y+1.04,2.1),u);
+         const u=Math.min(1,(t-p.bite)/.3);
+         p.mesh.position.lerpVectors(p.from,point.set(body.position.x,body.position.y+1.04,body.position.z+.3),u);
          p.mesh.scale.copy(p.scale).multiplyScalar(1-u);
          if(u===1){p.mesh.visible=false;p.state='done'}
        }
      }
-     if(!cleanup&&pieces.every(p=>p.state!=='air'&&p.state!=='waiting')){
+     drawTrack();
+     if(!cleanup&&pieces.every(p=>p.landed||p.state!=='loose')){
        cleanup=true;
-       if(eaten<pieces.length)status.textContent='あと'+(pieces.length-eaten)+'品！　落ちた料理の前に移動して拾おう';
+       if(eaten<pieces.length)status.textContent='あと'+(pieces.length-eaten)+'品。赤い印まで走って拾おう！';
      }
      if(pieces.every(p=>p.state==='done')){
        active=false;grandma.mouth.scale.y=.035;onFinish(eaten);

@@ -7,7 +7,11 @@ async function openTableFlip(catching=false) {
  if(catching){
    game.querySelector('h2').textContent='おばあちゃん、いただきます！';
    game.setAttribute('aria-label','お粗末にしない');
-   game.querySelector('small').textContent='投げた料理をキャッチ！　タップ・ドラッグか左右キーでおばあちゃんを移動';
+   game.querySelector('small').textContent='着地点の印をタップしてダッシュ。ドラッグ・左右キーでも移動できます';
+   const course=document.createElement('canvas');
+   course.className='catch-track';course.width=640;course.height=48;course.hidden=true;
+   course.setAttribute('aria-label','回収コース。印は具材の着地点、紫はおばあちゃん');
+   game.querySelector('.flip-stage').append(course);
  }
  document.body.append(game);
  // Fullscreen the document: modal dialogs themselves are ineligible fullscreen targets.
@@ -30,7 +34,7 @@ async function openTableFlip(catching=false) {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls},{elder,moods,catchingGame}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=1')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,autoPower}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=2')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -143,19 +147,28 @@ async function openTableFlip(catching=false) {
  const wave=time=>(1-Math.cos((time-started)*setting().pace/380))/2;
  const target=new T.Vector3(), shift=new T.Vector3();
  let lastShot, replaying=false, paused=false, flipTime=0;
- const catcher=catching?catchingGame({T,scene,camera,surface,pieces,status,grandma,onFinish:count=>{
+ let maxThrow=0;
+ const catcher=catching?catchingGame({T,surface,pieces,status,grandma,track:stage.querySelector(".catch-track"),onFinish:count=>{
    phase='result';controls.enabled=true;launch.hidden=false;launch.textContent='もう一度遊ぶ';
-   status.textContent='ごちそうさま！　'+rows.length+'段のおせち、'+count+'品を全部食べました。';
+   status.textContent='ごちそうさま！　'+rows.length+'段のおせち、'+count+'品を全部食べました。最長 '+maxThrow.toFixed(1)+' m';
  }}):null;
- function frameCatch(){
-   const dist=Math.max(9,5/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
-   target.set(0,1.65,0);controls.target.copy(target);
-   camera.position.set(0,1.65+dist*.29,dist);camera.lookAt(target);
+ function frameCatch(dt){
+   const pos=grandma.body.position;
+   const lead=pieces.reduce((a,b)=>b.state==='loose'&&!b.landed&&(!a||b.mesh.position.y>a.y)?b.mesh.position:a,null);
+   const x=lead?(lead.x+pos.x)/2:pos.x;
+   const y=lead?Math.max(1.5,lead.y*.5):1.5;
+   const spread=lead?Math.abs(pos.x-lead.x)*.5:0;
+   const tan=Math.tan(camera.fov*Math.PI/360);
+   const dist=Math.max(10,(spread+3.5)/(tan*camera.aspect),(y+2)/tan);
+   const blend=1-Math.exp(-dt*8);
+   target.set(x,y,0);controls.target.lerp(target,blend);
+   camera.position.lerp(shift.set(x,y+dist*.23,dist),blend);
+   camera.lookAt(controls.target);
  }
  function beginFlip(isReplay){
    replaying=isReplay;paused=false;flipTime=0;phase='flip';
    meter.hidden=true;launch.hidden=true;replay.hidden=true;pause.hidden=!isReplay;
-   mood.disabled=true;if(catching){controls.enabled=false;frameCatch()}
+   mood.disabled=true;if(catching){controls.enabled=false}
    pause.textContent='一時停止';status.textContent=isReplay?'リプレイ':'そりゃっ！';
  }
  replay.onclick=()=>{
@@ -167,6 +180,12 @@ async function openTableFlip(catching=false) {
  };
  function reset(){
    phase=catching?'ready':'angle';mood.disabled=false;controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
+   if(catching){
+     stage.querySelector('.catch-track').hidden=true;
+     grandma.body.position.set(0,0,1.8);grandma.body.rotation.z=0;
+     camera.position.copy(initialView).multiplyScalar(Math.max(1,(tableWidth+1.6)/(6.6*camera.aspect)));
+     controls.target.set(0,0,0);
+   }
    target.set(0,1,0);
    camera.position.add(shift.copy(target).sub(controls.target));controls.target.copy(target);controls.update();
    pause.hidden=true;replay.hidden=true;replaying=false;paused=false;
@@ -177,36 +196,48 @@ async function openTableFlip(catching=false) {
  launch.onclick=()=>{
    const now=performance.now();
    if(phase==='result'){reset();return}
-   if(phase==='ready'){beginFlip(false);return}
+   if(phase==='ready'){
+     angle=37+Math.random()*14;beginFlip(false);status.textContent=setting().name+'のおじいちゃん、振りかぶった！';return
+   }
    if(phase==='angle'){mood.disabled=true;angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
    if(phase==='power'){power=(8+15*wave(now))*boost*(1+.07*mood.selectedIndex);lastShot={angle,power,mood:mood.selectedIndex};beginFlip(false)}
  };
  function release(){
    table.updateMatrixWorld(true);
-   if(catching){phase='catch';catcher.start(setting());return}
    for(const p of pieces){
      scene.attach(p.mesh);p.origin=p.mesh.position.clone();
-     // Each dish has a repeatable launch response and air resistance.
-     const response=.86+((p.id*37+11)%47)/100, drag=.035+((p.id*19+5)%29)/110;
-     const radians=angle*Math.PI/180;
-     p.drag=drag;p.vx=power*response*Math.cos(radians);p.vy=power*response*Math.sin(radians);
-     p.vz=Math.sin(p.id*2.3)*1.7;p.land=(p.vy+Math.sqrt(p.vy*p.vy+19.62*Math.max(.01,p.origin.y-.09)))/9.81;
+   }
+   if(catching){
+     // A full three-tier meal reaches the mood's ceiling. Smaller servings retain most of its power.
+     const load=.92+.08*Math.min(1,(boost-1)/.64);
+     power=autoPower(pieces,angle*Math.PI/180,setting().range*load);
+   }
+   for(const p of pieces){
+     Object.assign(p,throwVelocity(p,power,angle*Math.PI/180));
+     p.descending=false;
      p.trailPos.fill(0);p.samples=0;
    }
-   phase='flight';elapsed=0;burst(new T.Vector3(0,2,0),75);
+   phase=catching?'catch':'flight';elapsed=0;
+   if(catching){
+     maxThrow=Math.max(...pieces.map(p=>p.vx*travelTime(p.drag,p.land)));
+     catcher.start(setting());
+     status.textContent=setting().name+'の一投！　最長 '+maxThrow.toFixed(1)+' m';
+   }
+   burst(new T.Vector3(0,2,0),75);
  }
  function flight(dt){
    elapsed+=dt;
    for(const p of pieces){
-     if(p.landed)continue;
-     const u=Math.min(elapsed,p.land),travel=-Math.expm1(-p.drag*u)/p.drag;
-     p.distance=p.vx*travel;
+     if(p.landed||(catching&&p.state!=='loose'))continue;
+     const u=Math.min(elapsed,p.land),travel=travelTime(p.drag,u);
+     p.descending=u>=p.vy/9.81;p.distance=p.vx*travel;
      p.mesh.position.set(p.origin.x+p.distance,p.origin.y+p.vy*u-4.905*u*u,p.origin.z+p.vz*travel);
      p.mesh.rotation.set(-1.1+u*(2+p.id%5),u*2,u*(1+p.id%3));
      p.trailPos.copyWithin(3,0,141);p.mesh.position.toArray(p.trailPos,0);p.samples=Math.min(48,p.samples+1);
      p.line.geometry.attributes.position.needsUpdate=true;p.line.geometry.setDrawRange(0,p.samples);
      if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;burst(p.mesh.position,16)}
    }
+   if(catching)return;
    const lead=pieces.reduce((a,b)=>a.distance>b.distance?a:b);
    target.copy(lead.mesh.position);
    if(pieces.every(p=>p.landed)){
@@ -229,14 +260,18 @@ async function openTableFlip(catching=false) {
      status.textContent=rows.length+'段・'+pieces.length+'品　'+(phase==='angle'?'角度 '+Math.round(18+54*value)+'°':'角度 '+Math.round(angle)+'°　力 '+Math.round(value*100)+'％');
      target.set(0,1,0);
    }else if(phase==='flip'){
-     flipTime+=paused?0:dt;const f=Math.min(1,flipTime/.38);table.rotation.z=-(catching ? .42 : .68)*f*f;grandpa.body.rotation.z=-.42*Math.sin(f*Math.PI/2);if(!catching)target.set(0,1.4,0);
+     flipTime+=paused?0:dt;const f=Math.min(1,flipTime/.38);table.rotation.z=-.68*f*f;grandpa.body.rotation.z=-.42*Math.sin(f*Math.PI/2);if(!catching)target.set(0,1.4,0);
      if(f===1)release();
-   }else if(phase==='catch'){frameCatch();catcher.tick(dt)}else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
+   }else if(phase==='catch'){
+     table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45);catcher.tick(dt);frameCatch(dt);
+   }else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
    for(let i=sparks.length-1;i>=0;i--){if(paused)break;const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
    sparks.forEach((s,i)=>{s.p.toArray(coords,i*3);s.color.toArray(colors,i*3)});
    particles.attributes.position.needsUpdate=true;particles.attributes.color.needsUpdate=true;particles.setDrawRange(0,sparks.length);
-   shift.copy(target).sub(controls.target).multiplyScalar(1-Math.exp(-dt*9));
-   controls.target.add(shift);camera.position.add(shift);controls.update();
+   if(phase!=='catch'){
+     shift.copy(target).sub(controls.target).multiplyScalar(1-Math.exp(-dt*9));
+     controls.target.add(shift);camera.position.add(shift);controls.update();
+   }
    renderer.render(scene,camera);frame=requestAnimationFrame(draw);
  }
  camera.position.copy(initialView).multiplyScalar(Math.max(1,(tableWidth+1.6)/(6.6*camera.aspect)));reset();last=performance.now();frame=requestAnimationFrame(draw);
