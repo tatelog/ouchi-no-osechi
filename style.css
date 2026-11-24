@@ -145,3 +145,4 @@ dialog.flip-game[open]{
 .result-heading button{min-height:44px;padding:6px 16px;white-space:nowrap;line-height:1.2}
 .overview .result-heading{position:sticky;top:0;z-index:1}
 @media(orientation:landscape) and (max-height:540px){.flip-game>.result-heading{grid-column:2}}
+.home .trailer-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;margin:2px auto;color:#843321;text-underline-offset:4px}

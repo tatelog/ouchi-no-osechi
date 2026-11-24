@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f8edd9">
+<title>おうちのおせち｜30秒予告</title>
+<meta name="description" content="「春の海」にのせて、お重の盛り付けからちゃぶ台返しまでを30秒で。">
+<meta property="og:type" content="video.other"><meta property="og:title" content="おうちのおせち｜30秒予告">
+<meta property="og:description" content="おせちを作る準備をしましょう。最後の10秒はちゃぶ台返しと空中キャッチ！">
+<meta property="og:url" content="https://tatelog.github.io/ouchi-no-osechi/preview/">
+<meta property="og:image" content="https://tatelog.github.io/ouchi-no-osechi/assets/brand/share.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../assets/brand/favicon.ico"><link rel="apple-touch-icon" href="../assets/brand/icon-180.png">
+<style>
+@font-face{font-family:klee;src:url(../assets/KleeOne-SemiBold.ttf);font-display:swap}
+*{box-sizing:border-box}body{margin:0;color:#3e2a1a;background:#f8edd9 url(../assets/fiber.webp);font:600 16px/1.5 klee,serif}
+main{width:min(100%,34rem);margin:auto;padding: max(8px,env(safe-area-inset-top)) 14px max(12px,env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}header a{display:flex;align-items:center;min-height:44px}header img{width:148px;height:auto}h1{font-size:17px;margin:0}
+.player{position:relative;aspect-ratio:9/16;width:min(100%,calc((100svh - 152px)*9/16));margin:auto;overflow:hidden;border-radius:14px;background:#f7ecd0;box-shadow:0 3px 14px #57331540}
+video{display:block;width:100%;height:100%;object-fit:contain}
+.start,.play-link{font:inherit;cursor:pointer;border:0;border-radius:12px;min-height:48px;background:#a13220 url(../assets/art/crayon-red.png) center/cover;color:#fff7e6;text-decoration:none;text-align:center;text-shadow:0 1px 2px #69261c}
+.start{position:absolute;bottom:8%;left:50%;transform:translateX(-50%);width:max-content;padding:8px 22px;box-shadow:0 2px 7px #4d281c44}.start[hidden]{display:none}
+.play-link{display:grid;place-items:center;width:min(100%,27rem);margin:10px auto 4px}
+details{font-size:13px;text-align:center}summary{cursor:pointer;min-height:32px;padding:6px}details p{margin:3px auto 8px}details a{color:#802f1b}
+:focus-visible{outline:3px solid #3c604e;outline-offset:2px}
+@media(orientation:landscape) and (max-height:550px){main{max-width:50rem;width:100%;display:grid;grid-template-columns:1fr 1fr;align-content:center;gap:8px}header,.play-link,details{grid-column:2}.player{grid-column:1;grid-row:1/5;width:min(100%,calc((100svh - 20px)*9/16))}}
+</style>
+</head><body><main>
+<header><a href="../" aria-label="おうちのおせち ホームへ"><img src="../assets/art/ouchi-title.webp" alt="おうちのおせち"></a><h1>30秒予告</h1></header>
+<div class="player"><video playsinline preload="none" controls poster="./poster.jpg" aria-label="おうちのおせち 30秒予告。盛り付け、ちゃぶ台返し、空中キャッチの順に紹介します"><source src="./ouchi-no-osechi-30s.mp4" type="video/mp4"> <a href="./ouchi-no-osechi-30s.mp4">動画を開く</a></video><button class="start" type="button" hidden>▶ 音付きで再生</button></div>
+<a class="play-link" href="../">おせちを作る</a>
+<details><summary>音楽とクレジット</summary><p>「春の海」作曲・宮城道雄。編曲・フルートはAlexander Gagarin、演奏はZhukovsky Symphony Orchestra、指揮はKonstantin Naumenko。2020年2月16日の録音から30秒を抜粋し、フェードを加えました。</p><p><a href="https://imslp.org/wiki/Haru_no_Umi_(Miyagi,_Michio)">録音の出典</a>　<a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">録音・予告動画のライセンス（CC BY-NC-SA 4.0）</a></p></details>
+</main><script>
+const video=document.querySelector('video'),start=document.querySelector('.start');
+start.hidden=false;video.controls=false;
+start.onclick=async()=>{
+  video.controls=true;video.muted=false;
+  try{await video.play()}catch{start.hidden=false;start.textContent='▶ もう一度再生'}
+};
+video.addEventListener('playing',()=>{start.hidden=true});
+video.addEventListener('ended',()=>{video.controls=false;start.textContent='▶ もう一度見る';start.hidden=false});
+</script></body></html>
