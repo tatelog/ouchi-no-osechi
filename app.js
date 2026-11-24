@@ -140,7 +140,7 @@ function board(t,interactive){
    if(id==null)b.textContent=interactive?'＋':'';
    else if(matchesPhoto && i<6)b.innerHTML='<img class="whole-portion" alt="" src="./assets/art/plated-'+id+'.png" style="inset:0;width:100%;height:100%">';
    else b.innerHTML=packServing(id,d.kam,pocket);
-   if(interactive && d.mode==='auto' && (id===2 || id>=48 || [13,14,15,28,29,35,40].includes(id)))b.classList.add('regional-slot');if(interactive)b.onclick=()=>slot(i);interior.append(b)
+   if(interactive)b.onclick=()=>slot(i);interior.append(b)
  });
  // A second layer fills the back of each occupied pocket, like pieces tucked beneath the front row.
  const underlay=document.createElement('div');underlay.className='tray-depth';underlay.setAttribute('aria-hidden','true');
