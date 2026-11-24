@@ -3,7 +3,7 @@
   "short_name": "おうちのおせち",
   "lang": "ja",
   "id": "../../",
-  "start_url": "../../",
+  "start_url": "../../app.html",
   "scope": "../../",
   "display": "standalone",
   "background_color": "#f8edd9",
