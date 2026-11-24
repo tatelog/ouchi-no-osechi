@@ -199,6 +199,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
      },
      title+'.png'
    );
+   if(!replaying)share.onclick();
  }
  const flightRate=1.45;
  function landingEffect(p){overlay.land(p);burst(p.mesh.position,16)}
