@@ -34,10 +34,10 @@ async function openTableFlip(catching=false,chosenMood=null) {
  const stage=game.querySelector('.flip-stage'), status=game.querySelector('p'), launch=game.querySelector('.flip-launch'), meter=game.querySelector('meter');
  game.querySelector('.flip-exit').onclick=()=>game.close();
  const replay=game.querySelector('.flip-replay'), pause=game.querySelector('.flip-pause');
- let renderer, frame, scene, controls, resize;
+ let renderer, frame, scene, controls, resize, overlay;
  const textures=new Map();
  game.addEventListener('close',()=>{
-   cancelAnimationFrame(frame);controls?.dispose();resize?.disconnect();
+   cancelAnimationFrame(frame);controls?.dispose();resize?.disconnect();overlay?.dispose();
    if(fullscreenRequest)fullscreenRequest.then(()=>{
      if(document.fullscreenElement===page && !document.querySelector('.flip-game[open]'))document.exitFullscreen().catch(()=>{});
    });
@@ -46,7 +46,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=3')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=3'),import('./throw-overlay.js')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -59,6 +59,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    const width=Math.max(1,stage.clientWidth),height=Math.max(1,stage.clientHeight);
    camera.aspect=width/height;camera.updateProjectionMatrix();renderer.setSize(width,height,false);
  }
+ overlay=throwOverlay(T,stage,camera);
  resize=new ResizeObserver(resizeStage);resize.observe(stage);resizeStage();
  controls=new OrbitControls(camera,renderer.domElement);
  controls.enablePan=false;controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=35;
@@ -224,7 +225,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
  };
  function reset(){
-   ink.hidden=true;grandpa.mouth.scale.y=.03;
+   overlay.clear();angle=undefined;ink.hidden=true;grandpa.mouth.scale.y=.03;
    for(const {layer,baseY} of layers){layer.position.set(0,baseY,0);layer.rotation.z=0}
    phase=catching?'ready':'angle';controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    if(catching){
@@ -282,7 +283,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
      p.mesh.rotation.set(-1.1+u*(2+p.id%5),u*2,u*(1+p.id%3));
      p.trailPos.copyWithin(3,0,141);p.mesh.position.toArray(p.trailPos,0);p.samples=Math.min(48,p.samples+1);
      p.line.geometry.attributes.position.needsUpdate=true;p.line.geometry.setDrawRange(0,p.samples);
-     if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;burst(p.mesh.position,16)}
+     if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;overlay.land(p);burst(p.mesh.position,16)}
    }
    if(catching)return;
    const lead=pieces.reduce((a,b)=>a.distance>b.distance?a:b);
@@ -329,7 +330,10 @@ async function openTableFlip(catching=false,chosenMood=null) {
    }
    if(!paused)updateInk(dt);
    if(ink.hidden)grandpa.mouth.scale.y=.03;
-   renderer.render(scene,camera);frame=requestAnimationFrame(draw);
+   renderer.render(scene,camera);
+   const shownAngle=phase==='angle'?18+54*wave(now):angle;
+   overlay.draw(paused?0:dt,shownAngle,phase==='angle'||phase==='power',1.45+(rows.length-1)*.39,phase==='power'?wave(now):null);
+   frame=requestAnimationFrame(draw);
  }
  camera.position.copy(initialView).multiplyScalar(Math.max(1,(tableWidth+1.6)/(6.6*camera.aspect)));reset();last=performance.now();frame=requestAnimationFrame(draw);
  }catch(error){status.textContent='3D画面を開けませんでした。WebGL 2対応のブラウザでお試しください。';launch.hidden=true;console.error(error)}
