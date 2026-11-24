@@ -5,14 +5,21 @@ async function openTableFlip() {
  game.setAttribute('aria-label','ちゃぶ台返し');
  game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>ドラッグで回転・ピンチで拡大</small><div class="flip-views" role="group" aria-label="カメラの視点"><button>斜め</button><button>横</button><button>上</button></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
  document.body.append(game);
+ // Fullscreen the document: modal dialogs themselves are ineligible fullscreen targets.
+ const page=document.documentElement;
+ const fullscreenRequest=!document.fullscreenElement && page.requestFullscreen
+   ? page.requestFullscreen().catch(()=>{}) : null;
  game.showModal();
  const stage=game.querySelector('.flip-stage'), status=game.querySelector('p'), launch=game.querySelector('.flip-launch'), meter=game.querySelector('meter');
  game.querySelector('.flip-exit').onclick=()=>game.close();
  const replay=game.querySelector('.flip-replay'), pause=game.querySelector('.flip-pause');
- let renderer, frame, scene, controls;
+ let renderer, frame, scene, controls, resize;
  const textures=new Map();
  game.addEventListener('close',()=>{
-   cancelAnimationFrame(frame);controls?.dispose();
+   cancelAnimationFrame(frame);controls?.dispose();resize?.disconnect();
+   if(fullscreenRequest)fullscreenRequest.then(()=>{
+     if(document.fullscreenElement===page && !document.querySelector('.flip-game[open]'))document.exitFullscreen().catch(()=>{});
+   });
    scene?.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});
    textures.forEach(tex=>tex.dispose());
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
@@ -23,10 +30,15 @@ async function openTableFlip() {
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
- renderer.setSize(680,480,false);
+
  scene=new T.Scene();scene.background=new T.Color(0xffe2b4);
  scene.fog=new T.FogExp2(0xffdfb1,.007);
  const camera=new T.PerspectiveCamera(40,680/480,.05,500);
+ function resizeStage(){
+   const width=Math.max(1,stage.clientWidth),height=Math.max(1,stage.clientHeight);
+   camera.aspect=width/height;camera.updateProjectionMatrix();renderer.setSize(width,height,false);
+ }
+ resize=new ResizeObserver(resizeStage);resize.observe(stage);resizeStage();
  controls=new OrbitControls(camera,renderer.domElement);
  controls.enablePan=false;controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=35;
  controls.maxPolarAngle=Math.PI*.49;
