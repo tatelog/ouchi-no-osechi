@@ -3,21 +3,22 @@ async function openTableFlip() {
  const game = document.createElement('dialog');
  game.className = 'flip-game';
  game.setAttribute('aria-label','ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-exit">お重に戻る</button></div>';
+ game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>ドラッグで回転・ピンチで拡大</small><div class="flip-views" role="group" aria-label="カメラの視点"><button>斜め</button><button>横</button><button>上</button></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
  document.body.append(game);
  game.showModal();
  const stage=game.querySelector('.flip-stage'), status=game.querySelector('p'), launch=game.querySelector('.flip-launch'), meter=game.querySelector('meter');
  game.querySelector('.flip-exit').onclick=()=>game.close();
- let renderer, frame, scene;
+ const replay=game.querySelector('.flip-replay'), pause=game.querySelector('.flip-pause');
+ let renderer, frame, scene, controls;
  const textures=new Map();
  game.addEventListener('close',()=>{
-   cancelAnimationFrame(frame);
+   cancelAnimationFrame(frame);controls?.dispose();
    scene?.traverse(o=>{o.geometry?.dispose();o.material?.dispose()});
    textures.forEach(tex=>tex.dispose());
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const T=await import('./assets/vendor/three.module.js');
+ const [T,{OrbitControls}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -26,6 +27,13 @@ async function openTableFlip() {
  scene=new T.Scene();scene.background=new T.Color(0xffe2b4);
  scene.fog=new T.FogExp2(0xffdfb1,.007);
  const camera=new T.PerspectiveCamera(40,680/480,.05,500);
+ controls=new OrbitControls(camera,renderer.domElement);
+ controls.enablePan=false;controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=35;
+ controls.maxPolarAngle=Math.PI*.49;
+ const viewOffsets=[new T.Vector3(4.5,6,7.4),new T.Vector3(0,2,10),new T.Vector3(0,10,.05)];
+ game.querySelectorAll('.flip-views button').forEach((button,i)=>{
+   button.onclick=()=>{camera.position.copy(controls.target).add(viewOffsets[i]);controls.update()};
+ });
  const light=new T.DirectionalLight(0xffefcc,2.8);light.position.set(-5,10,6);scene.add(light,new T.HemisphereLight(0xfff6e0,0xe2ae87,2));
  const group=parent=>{const g=new T.Group();parent.add(g);return g};
  function box(parent,x,y,z,w,h,l,color){
@@ -77,13 +85,28 @@ async function openTableFlip() {
    if(sparks.length>capacity)sparks.splice(0,sparks.length-capacity);
  }
  const boost=1+.11*(rows.length-1)+.021*(pieces.length-1);
- let phase,started,angle,power,elapsed,last,best=0,shake=0;
+ let phase,started,angle,power,elapsed,last,best=0;
  try{best=Number(localStorage.getItem('osechi-flip-3d-best'))||0}catch{}
  const wave=time=>(1-Math.cos((time-started)/380))/2;
- const look=new T.Vector3(), target=new T.Vector3(), eye=new T.Vector3();
+ const target=new T.Vector3(), shift=new T.Vector3();
+ let lastShot, replaying=false, paused=false, flipTime=0;
+ function beginFlip(isReplay){
+   replaying=isReplay;paused=false;flipTime=0;phase='flip';
+   meter.hidden=true;launch.hidden=true;replay.hidden=true;pause.hidden=!isReplay;
+   pause.textContent='一時停止';status.textContent=isReplay?'リプレイ':'そりゃっ！';
+ }
+ replay.onclick=()=>{
+   if(!lastShot)return;
+   reset();angle=lastShot.angle;power=lastShot.power;beginFlip(true);
+ };
+ pause.onclick=()=>{
+   paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
+ };
  function reset(){
-   phase='angle';started=performance.now();elapsed=0;shake=0;sparks.length=0;table.rotation.z=0;
-   camera.position.set(4.5,7,7.4);look.set(0,1,0);
+   phase='angle';started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
+   target.set(0,1,0);
+   camera.position.add(shift.copy(target).sub(controls.target));controls.target.copy(target);controls.update();
+   pause.hidden=true;replay.hidden=true;replaying=false;paused=false;
    for(const p of pieces){table.add(p.mesh);p.mesh.position.copy(p.home);p.mesh.scale.copy(p.scale);p.mesh.rotation.set(-Math.PI/2,0,0);p.line.geometry.setDrawRange(0,0);p.landed=false;p.distance=0}
    meter.hidden=false;launch.disabled=false;launch.hidden=false;launch.textContent='角度を決める';
    status.textContent=rows.length+'段・'+pieces.length+'品　飛ばす角度を狙ってタップ';
@@ -92,7 +115,7 @@ async function openTableFlip() {
    const now=performance.now();
    if(phase==='result'){reset();return}
    if(phase==='angle'){angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
-   if(phase==='power'){power=(8+15*wave(now))*boost;phase='flip';started=now;meter.hidden=true;launch.hidden=true;status.textContent='そりゃっ！'}
+   if(phase==='power'){power=(8+15*wave(now))*boost;lastShot={angle,power};beginFlip(false)}
  };
  function release(){
    table.updateMatrixWorld(true);
@@ -105,7 +128,7 @@ async function openTableFlip() {
      p.vz=Math.sin(p.id*2.3)*1.7;p.land=(p.vy+Math.sqrt(p.vy*p.vy+19.62*Math.max(.01,p.origin.y-.09)))/9.81;
      p.trailPos.fill(0);p.samples=0;
    }
-   phase='flight';elapsed=0;shake=.25;burst(new T.Vector3(0,2,0),75);
+   phase='flight';elapsed=0;burst(new T.Vector3(0,2,0),75);
  }
  function flight(dt){
    elapsed+=dt;
@@ -120,10 +143,13 @@ async function openTableFlip() {
      if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;burst(p.mesh.position,16)}
    }
    const lead=pieces.reduce((a,b)=>a.distance>b.distance?a:b);
-   target.copy(lead.mesh.position);eye.copy(target).add(new T.Vector3(3,3.5,8));
+   target.copy(lead.mesh.position);
    if(pieces.every(p=>p.landed)){
-     phase='result';best=Math.max(best,lead.distance);
-     try{localStorage.setItem('osechi-flip-3d-best',best)}catch{}
+     phase='result';pause.hidden=true;replay.hidden=false;
+     if(!replaying){
+       best=Math.max(best,lead.distance);
+       try{localStorage.setItem('osechi-flip-3d-best',best)}catch{}
+     }
      status.textContent='最遠は'+names[lead.id]+'！ '+lead.distance.toFixed(1)+' m（自己ベスト '+best.toFixed(1)+' m）';
      launch.hidden=false;launch.textContent='もう一度返す';burst(target,60);
    }else status.textContent=names[lead.id]+'　'+lead.distance.toFixed(1)+' m';
@@ -135,19 +161,19 @@ async function openTableFlip() {
      const value=wave(now);meter.value=value*100;
      if(phase==='power')table.rotation.z=Math.sin(now*.032)*value*.035;
      status.textContent=rows.length+'段・'+pieces.length+'品　'+(phase==='angle'?'角度 '+Math.round(18+54*value)+'°':'角度 '+Math.round(angle)+'°　力 '+Math.round(value*100)+'％');
-     target.set(0,1,0);eye.set(4.5,7,7.4);
+     target.set(0,1,0);
    }else if(phase==='flip'){
-     const f=Math.min(1,(now-started)/380);table.rotation.z=-.68*f*f;target.set(0,1.4,0);eye.set(3.7,4,6.5);
+     flipTime+=paused?0:dt;const f=Math.min(1,flipTime/.38);table.rotation.z=-.68*f*f;target.set(0,1.4,0);
      if(f===1)release();
-   }else if(phase==='flight'){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
-   for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
+   }else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
+   for(let i=sparks.length-1;i>=0;i--){if(paused)break;const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
    sparks.forEach((s,i)=>{s.p.toArray(coords,i*3);s.color.toArray(colors,i*3)});
    particles.attributes.position.needsUpdate=true;particles.attributes.color.needsUpdate=true;particles.setDrawRange(0,sparks.length);
-   const blend=1-Math.exp(-dt*7);look.lerp(target,blend);camera.position.lerp(eye,blend);
-   shake=Math.max(0,shake-dt);camera.lookAt(look.x,look.y+Math.sin(now*.08)*shake*.4,look.z);
+   shift.copy(target).sub(controls.target).multiplyScalar(1-Math.exp(-dt*9));
+   controls.target.add(shift);camera.position.add(shift);controls.update();
    renderer.render(scene,camera);frame=requestAnimationFrame(draw);
  }
- reset();last=performance.now();frame=requestAnimationFrame(draw);
+ camera.position.copy(viewOffsets[0]);reset();last=performance.now();frame=requestAnimationFrame(draw);
  }catch(error){status.textContent='3D画面を開けませんでした。WebGL 2対応のブラウザでお試しください。';launch.hidden=true;console.error(error)}
 }
 

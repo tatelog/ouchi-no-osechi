@@ -117,3 +117,4 @@ body .sheet button.picker-handle{position:relative;display:grid;place-items:cent
 @media(max-width:640px) and (max-height:680px){#content>.board.packed{width:calc(min(72%,29dvh) * var(--tray-scale,1))}}
 .tabs .restart{margin-left:auto;white-space:nowrap}.tabs .restart+.finish{margin-left:0}.tabs:has(.restart){gap:3px}.tabs:has(.restart) button{padding-inline:clamp(4px,1.6vw,12px);white-space:nowrap}
 .flip-game canvas{display:block;width:100%;height:auto;border-radius:12px}.flip-game p{margin:12px 0;font-size:16px}.flip-game meter{width:85%;height:18px;accent-color:#a43124}.flip-game [hidden]{display:none}
+.flip-game .flip-stage{touch-action:none}.flip-game small{display:block;margin-top:5px}.flip-game .flip-views button{min-width:48px;min-height:44px;margin:2px}
