@@ -228,13 +228,16 @@ function result(){
 }
 function shareMenu(){
  const text='おうちのおせちが完成！ '+draft().tiers.length+'段重にしました。 #おうちのおせち';
+ showXShare(text,createTrayImage,'おうちのおせち.png');
+}
+function showXShare(text,createImage,filename){
  const openX=()=>window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
  let file;
  function manual(){
   ask('画像を添えてXで投稿',[
    ['画像を保存',()=>{const url=URL.createObjectURL(file);const link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);manual()}],
-   ['Xの投稿画面へ',openX],['戻る',shareMenu]]);
-  const p=document.createElement('p');p.textContent='お重の画像を保存して、Xの投稿画面で添付してください。';inside.querySelector('h2').after(p)
+   ['Xの投稿画面へ',openX],['戻る',()=>showXShare(text,createImage,filename)]]);
+  const p=document.createElement('p');p.textContent='画像を保存して、Xの投稿画面で添付してください。';inside.querySelector('h2').after(p)
  }
  async function withImage(){
   const payload={files:[file],text};
@@ -245,7 +248,7 @@ function shareMenu(){
  }
  ask('Xで投稿',[['画像付き',withImage],['テキストのみ',openX],['閉じる',()=>{}]]);
  const imageButton=inside.querySelector('button');imageButton.disabled=true;
- createTrayImage().then(blob=>{file=new File([blob],'おうちのおせち.png',{type:'image/png'});imageButton.disabled=false}).catch(()=>{imageButton.textContent='画像を準備できませんでした'})
+ createImage().then(blob=>{file=new File([blob],filename,{type:'image/png'});imageButton.disabled=false}).catch(()=>{imageButton.textContent='画像を準備できませんでした'})
 }
 async function createTrayImage(){
  const boards=[...document.querySelectorAll('.result .board')],tray=new Image();tray.src='./assets/art/tray.webp';await tray.decode();

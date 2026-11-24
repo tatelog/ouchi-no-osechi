@@ -15,7 +15,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
  const game = document.createElement('dialog');
  game.className = 'flip-game';
  game.setAttribute('aria-label','ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
+ game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-share primary" hidden>Xで投稿</button><button class="flip-exit">お重に戻る</button></div>';
  if(catching){
    game.querySelector('h2').textContent='おばあちゃん、いただきます！';
    game.setAttribute('aria-label','お粗末にしない');
@@ -176,8 +176,36 @@ async function openTableFlip(catching=false,chosenMood=null) {
    grandmaSpeech.style.left=T.MathUtils.clamp((projected.x+1)*50,28,72)+'%';
    grandmaSpeech.style.top=T.MathUtils.clamp((1-projected.y)*50,22,81)+'%';
  }
+ const share=game.querySelector('.flip-share');
+ function offerResultShare(title,lines){
+   share.hidden=false;
+   share.onclick=()=>showXShare(
+     [title,...lines,'#おうちのおせち'].join('\n'),
+     async()=>{
+       const card=document.createElement('canvas');card.width=1000;card.height=760;
+       const ctx=card.getContext('2d');
+       ctx.fillStyle='#fff0d4';ctx.fillRect(0,0,1000,760);
+       ctx.fillStyle='#712e21';ctx.font='bold 44px klee,serif';ctx.fillText(title,38,65,925);
+       // Read WebGL immediately after rendering, before its drawing buffer is cleared.
+       renderer.render(scene,camera);
+       const src=renderer.domElement,scale=Math.min(924/src.width,465/src.height);
+       const w=src.width*scale,h=src.height*scale;
+       ctx.fillStyle='#ffe2b4';ctx.fillRect(38,93,924,465);
+       ctx.drawImage(src,(1000-w)/2,93+(465-h)/2,w,h);
+       ctx.fillStyle='#38291d';ctx.font='bold 37px klee,serif';
+       lines.forEach((line,i)=>ctx.fillText(line,38,622+i*58,924));
+       ctx.font='24px klee,serif';ctx.fillText('おうちのおせち',38,732);
+       return new Promise((resolve,reject)=>card.toBlob(blob=>blob?resolve(blob):reject(new Error('画像生成失敗')),'image/png'));
+     },
+     title+'.png'
+   );
+ }
  const catcher=catching?catchingGame({T,surface,pieces,status,grandma,say,kickDust:pos=>burst(pos,6),track:stage.querySelector(".catch-track"),onFinish:(count,missed)=>{
    phase='result';controls.enabled=true;launch.hidden=false;launch.textContent='もう一度遊ぶ';
+   offerResultShare('お粗末にしない',[
+     condition.name+'の一投！　'+rows.length+'段重・最長 '+maxThrow.toFixed(1)+' m',
+     '食べた '+count+'品・落とした '+missed+'品'
+   ]);
    status.textContent=(missed?'食べた '+count+'品・落とした '+missed+'品':'ごちそうさま！　全'+count+'品を完食')+'　最長 '+maxThrow.toFixed(1)+' m';
  }}):null;
  function frameCatch(dt){
@@ -240,7 +268,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
  };
  function reset(){
-   grandmaSpeech.hidden=true;overlay.clear();angle=undefined;ink.hidden=true;grandpa.mouth.scale.y=.03;
+   share.hidden=true;share.onclick=null;grandmaSpeech.hidden=true;overlay.clear();angle=undefined;ink.hidden=true;grandpa.mouth.scale.y=.03;
    for(const {layer,baseY} of layers){layer.position.set(0,baseY,0);layer.rotation.z=0}
    phase=catching?'ready':'angle';controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    if(catching){
@@ -315,6 +343,10 @@ async function openTableFlip(catching=false,chosenMood=null) {
        try{localStorage.setItem('osechi-flip-3d-best',best)}catch{}
      }
      status.textContent='最遠は'+names[lead.id]+'！ '+lead.distance.toFixed(1)+' m（自己ベスト '+best.toFixed(1)+' m）';
+     offerResultShare('お粗末にする',[
+       '最遠は'+names[lead.id]+'！　'+lead.distance.toFixed(1)+' m',
+       rows.length+'段重・投射角 '+angle.toFixed(1)+'°・自己ベスト '+best.toFixed(1)+' m'
+     ]);
      launch.hidden=false;launch.textContent='もう一度返す';burst(target,60);
    }else status.textContent=names[lead.id]+'　'+lead.distance.toFixed(1)+' m';
  }
