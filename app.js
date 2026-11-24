@@ -232,7 +232,8 @@ function shareMenu(){
  showXShare(text,createTrayImage,'おうちのおせち.png');
 }
 function showXShare(text,createImage,filename){
- const openX=()=>window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(text),'_blank','noopener,noreferrer');
+ const postText=text+'\nhttps://tatelog.github.io/ouchi-no-osechi/';
+ const openX=()=>window.open('https://twitter.com/intent/tweet?text='+encodeURIComponent(postText),'_blank','noopener,noreferrer');
  let file;
  function manual(){
   ask('画像を添えてXで投稿',[
@@ -241,7 +242,7 @@ function showXShare(text,createImage,filename){
   const p=document.createElement('p');p.textContent='画像を保存して、Xの投稿画面で添付してください。';inside.querySelector('h2').after(p)
  }
  async function withImage(){
-  const payload={files:[file],text};
+  const payload={files:[file],text:postText};
   try{
    if(navigator.canShare?.(payload)){await navigator.share(payload);return}
   }catch(err){if(err.name==='AbortError')return}
