@@ -13,25 +13,28 @@ export function elder(T,scene,grandma){
  }
  const skin=0xffc597,hair=0xe3ded3,coat=grandma?0xad4964:0x465679;
  part(body,coat,0,.52,0,.39,.48,.27);
- for(const x of [-.2,.2])part(body,0x3b302d,x,.1,.06,.16,.11,.23);
+ const feet=[-.2,.2].map(x=>part(body,0x3b302d,x,.1,.06,.16,.11,.23));
  part(body,skin,0,1.15,0,.36,.38,.31);
  part(body,hair,0,1.39,-.045,.365,.17,.29);
  if(grandma)part(body,hair,0,1.57,-.14,.15,.15,.14);
  else for(const sign of [-1,1])part(body,hair,sign*.077,1.08,.3,.096,.042,.037);
  for(const sign of [-1,1]){
    part(body,0x372a24,sign*.13,1.22,.29,.031,.04,.024);
+   if(grandma)part(body,0x533c38,sign*.135,1.29,.292,.097,.025,.024).rotation.z=sign*.42;
    part(body,0xf18f80,sign*.23,1.12,.22,.066,.037,.03);
  }
  const mouth=part(body,0x6e2a22,0,1.01,.3,.066,.03,.02);
- for(const sign of [-1,1]){
-   part(body,coat,sign*.34,.71,.1,.14,.24,.14);
-   part(body,skin,sign*.34,.78,.27,.105,.12,.1);
- }
+ const arms=[-1,1].map(sign=>{
+   const arm=new T.Group();arm.position.set(sign*.34,.84,.1);body.add(arm);
+   part(arm,coat,0,-.13,0,.14,.24,.14);
+   part(arm,skin,0,-.06,.17,.105,.12,.1);
+   return arm;
+ });
  if(grandma){
    part(body,0xae3825,0,.74,.39,.37,.16,.25);
    part(body,0xf0cc87,0,.835,.39,.35,.045,.24);
  }
- return {body,mouth};
+ return {body,mouth,arms,feet};
 }
 
 // Linear air drag acts on every axis. These equations are also used by the angle search.
@@ -74,9 +77,10 @@ export function bestThrowAngle(pieces,power){
  return bestAngle*180/Math.PI;
 }
 
-export function catchingGame({T,surface,pieces,status,grandma,track,say,onFinish}){
+export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust,onFinish}){
  let active=false,t=0,desired=0,eaten=0,chew=0,settings,extent,missed,nextComplaint;
- let drag=null;
+ const entranceDuration=.62;
+ let entryX=0,dustTime=0,drag=null;
  const keys=new Set(),point=new T.Vector3(),body=grandma.body;
  const ctx=track.getContext('2d');
  function steer(e){
@@ -111,15 +115,16 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,onFinish
    ctx.fillText(Math.round(extent)+' m',w-5,15);ctx.textAlign='left';
  }
  return {
-   start(mood){
+   get entering(){return active&&t<entranceDuration},
+   start(mood,startX){
      active=true;missed=0;nextComplaint=0;settings=mood;t=0;eaten=0;chew=0;drag=null;keys.clear();desired=0;
-     body.position.set(0,0,1.8);
+     entryX=startX;dustTime=0;body.position.set(entryX,0,1.8);body.visible=true;
      for(const p of pieces){
        p.state='loose';p.dest=p.origin.x+p.vx*travelTime(p.drag,p.land);p.from=new T.Vector3();
      }
      extent=Math.ceil((Math.max(...pieces.map(p=>p.dest))+2)/5)*5;
      track.hidden=false;drawTrack();
-     say(['また始まったよ！','あたしは皿じゃないよ！','誰が作ったと思ってんだい！','正月早々、何すんだい！'][moods.indexOf(mood)]);
+     say(['こらぁーっ！','またあんたかーっ！','誰が作ったと思ってんだい！','こらジジイ！ 待ちなーっ！'][moods.indexOf(mood)]);
      status.textContent='地面に落ちる前にキャッチ！';
    },
    tick(dt){
@@ -128,7 +133,11 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,onFinish
      const step=settings.sprint*dt;
      desired=T.MathUtils.clamp(desired+step*(Number(keys.has('ArrowRight'))-Number(keys.has('ArrowLeft'))),0,extent);
      const prev=body.position.x;
-     body.position.x+=T.MathUtils.clamp(desired-prev,-step,step);
+     const entering=t<entranceDuration;
+     if(entering){
+       const progress=t/entranceDuration;
+       body.position.x=entryX*(1-progress)*(1-progress);
+     }else body.position.x+=T.MathUtils.clamp(desired-prev,-step,step);
      // The player picks the distance. Grandma cuts toward the nearest dish in depth.
      let nearest=null,gap=Infinity;
      for(const p of pieces){
@@ -136,11 +145,16 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,onFinish
        const dx=Math.abs(p.mesh.position.x-body.position.x);
        if(dx<gap){nearest=p;gap=dx}
      }
-     if(nearest)body.position.z+=T.MathUtils.clamp(nearest.mesh.position.z-body.position.z,-step,step);
-     const running=Math.abs(prev-body.position.x)>.01;
-     body.position.y=running?Math.abs(Math.sin(t*24))*.2:chew*.35;
-     body.rotation.z=running?-.19*Math.sign(desired-prev):0;
-     grandma.mouth.scale.y=.035+chew*.15;
+     if(nearest&&!entering)body.position.z+=T.MathUtils.clamp(nearest.mesh.position.z-body.position.z,-step,step);
+     const running=entering||Math.abs(prev-body.position.x)>.01;
+     const stride=running?Math.sin(t*31):0;
+     body.position.y=running?Math.abs(stride)*.24:chew*.35;
+     body.rotation.z=running?-.34*Math.sign(body.position.x-prev):0;
+     body.rotation.y=running?.55*Math.sign(body.position.x-prev):0;
+     grandma.arms.forEach((arm,i)=>arm.rotation.x=(i?1:-1)*stride*.98);
+     grandma.feet.forEach((foot,i)=>{foot.position.z=.06+(i?1:-1)*stride*.23;foot.position.y=.1+Math.max(0,(i?1:-1)*stride)*.18});
+     grandma.mouth.scale.y=entering?.12:.035+chew*.15;
+     if(running&&t>=dustTime){kickDust(body.position);dustTime=t+.085}
      for(const p of pieces){
        if(p.state==='loose'){
          if(p.landed){

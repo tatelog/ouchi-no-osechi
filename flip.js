@@ -6,7 +6,7 @@ function chooseGrandpaMood(moods,onSelect){
 async function openTableFlip(catching=false,chosenMood=null) {
  if(catching&&!chosenMood){
    try{
-     const {moods}=await import('./catch.js?v=4');
+     const {moods}=await import('./catch.js?v=5');
      chooseGrandpaMood(moods,mood=>openTableFlip(true,mood));
    }catch{notice('コンディションを読み込めませんでした。もう一度お試しください')}
    return;
@@ -46,7 +46,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=4'),import('./throw-overlay.js')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=5'),import('./throw-overlay.js')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -107,7 +107,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
  const grandpa=elder(T,scene,false);grandpa.body.position.set(-tableWidth/2-.3,0,0);
  grandpa.body.scale.setScalar(1.3);
  const grandma=catching?elder(T,scene,true):null;
- if(grandma)grandma.body.position.set(0,0,1.8);
+ if(grandma)grandma.body.visible=false;
  const pieces=[],loader=new T.TextureLoader();
  rows.forEach((row,tier)=>{
    const layer=group(table);
@@ -176,7 +176,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    grandmaSpeech.style.left=T.MathUtils.clamp((projected.x+1)*50,28,72)+'%';
    grandmaSpeech.style.top=T.MathUtils.clamp((1-projected.y)*50,22,81)+'%';
  }
- const catcher=catching?catchingGame({T,surface,pieces,status,grandma,say,track:stage.querySelector(".catch-track"),onFinish:(count,missed)=>{
+ const catcher=catching?catchingGame({T,surface,pieces,status,grandma,say,kickDust:pos=>burst(pos,6),track:stage.querySelector(".catch-track"),onFinish:(count,missed)=>{
    phase='result';controls.enabled=true;launch.hidden=false;launch.textContent='もう一度遊ぶ';
    status.textContent=(missed?'食べた '+count+'品・落とした '+missed+'品':'ごちそうさま！　全'+count+'品を完食')+'　最長 '+maxThrow.toFixed(1)+' m';
  }}):null;
@@ -245,7 +245,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    phase=catching?'ready':'angle';controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    if(catching){
      stage.querySelector('.catch-track').hidden=true;
-     grandma.body.position.set(0,0,1.8);grandma.body.rotation.z=0;
+     grandma.body.visible=false;grandma.body.rotation.set(0,0,0);
      camera.position.copy(initialView).multiplyScalar(Math.max(1,(tableWidth+1.6)/(6.6*camera.aspect)));
      controls.target.set(0,0,0);
    }
@@ -283,7 +283,12 @@ async function openTableFlip(catching=false,chosenMood=null) {
    phase=catching?'catch':'flight';elapsed=0;
    if(catching){
      maxThrow=Math.max(...pieces.map(p=>p.vx*travelTime(p.drag,p.land)));
-     catcher.start(condition);
+     // Keep the table in view while she charges in from beyond the left edge.
+     controls.target.set(0,1.25,0);target.copy(controls.target);
+     const distance=Math.max(8,4.6/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
+     camera.position.set(0,2.9,distance);camera.lookAt(target);camera.updateMatrixWorld();
+     const leftEdge=-(distance*Math.tan(camera.fov*Math.PI/360)*camera.aspect+1.8);
+     catcher.start(condition,leftEdge);
      status.textContent=condition.name+'の一投！　'+angle.toFixed(1)+'°・最長 '+maxThrow.toFixed(1)+' m';
    }
    burst(new T.Vector3(0,2,0),75);
@@ -334,7 +339,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
      }
      if(f===1)release();
    }else if(phase==='catch'){
-     table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45);catcher.tick(dt);frameCatch(dt);
+     table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45);catcher.tick(dt);if(!catcher.entering)frameCatch(dt);
    }else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
    for(let i=sparks.length-1;i>=0;i--){if(paused)break;const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
    sparks.forEach((s,i)=>{s.p.toArray(coords,i*3);s.color.toArray(colors,i*3)});
