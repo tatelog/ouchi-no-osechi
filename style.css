@@ -131,6 +131,5 @@ dialog.flip-game[open]{
   .flip-game .flip-stage{grid-column:1;grid-row:1/7;height:100%}
   .flip-game>h2,.flip-game>small,.flip-game>p,.flip-game>meter,.flip-game>div:last-child{grid-column:2}
 }
-.flip-mood{margin:5px;font-size:15px}.flip-mood select{font:inherit;color:inherit;background:#f9e6c4;padding:6px 12px;border:1px solid #ae805c;border-radius:8px}@media(orientation:landscape) and (max-height:540px){.flip-game>.flip-mood{grid-column:2}}
 
 .flip-game .flip-stage canvas.catch-track{z-index:1;inset:auto 3% 8px;width:94%;height:32px;border:1px solid #ad895a;border-radius:6px;touch-action:none;cursor:pointer}

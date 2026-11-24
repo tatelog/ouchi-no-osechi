@@ -1,9 +1,21 @@
-async function openTableFlip(catching=false) {
+function chooseGrandpaMood(moods,onSelect){
+ const choices=moods.map(mood=>[mood.name,()=>onSelect(mood)]);
+ ask('おじいちゃんのコンディションは？',[...choices,['戻る',()=>{}]]);
+}
+
+async function openTableFlip(catching=false,chosenMood=null) {
+ if(catching&&!chosenMood){
+   try{
+     const {moods}=await import('./catch.js?v=2');
+     chooseGrandpaMood(moods,mood=>openTableFlip(true,mood));
+   }catch{notice('コンディションを読み込めませんでした。もう一度お試しください')}
+   return;
+ }
  const meal = draft();
  const game = document.createElement('dialog');
  game.className = 'flip-game';
  game.setAttribute('aria-label','ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><label class="flip-mood">おじいちゃんの調子 <select></select></label><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
+ game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
  if(catching){
    game.querySelector('h2').textContent='おばあちゃん、いただきます！';
    game.setAttribute('aria-label','お粗末にしない');
@@ -52,9 +64,7 @@ async function openTableFlip(catching=false) {
  controls.enablePan=false;controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=35;
  controls.maxPolarAngle=Math.PI*.49;
  const surface=renderer.domElement;
- const mood=game.querySelector('.flip-mood select');
- for(const option of moods)mood.add(new Option(option.name));
- const setting=()=>moods[mood.selectedIndex];
+ let condition=chosenMood??moods[0];
  const pointers=new Set();
  let tap=null;
  surface.addEventListener('pointerdown',event=>{
@@ -144,7 +154,7 @@ async function openTableFlip(catching=false) {
  const boost=1+.11*(rows.length-1)+.021*(pieces.length-1);
  let phase,started,angle,power,elapsed,last,best=0;
  try{best=Number(localStorage.getItem('osechi-flip-3d-best'))||0}catch{}
- const wave=time=>(1-Math.cos((time-started)*setting().pace/380))/2;
+ const wave=time=>(1-Math.cos((time-started)*condition.pace/380))/2;
  const target=new T.Vector3(), shift=new T.Vector3();
  let lastShot, replaying=false, paused=false, flipTime=0;
  let maxThrow=0;
@@ -168,18 +178,18 @@ async function openTableFlip(catching=false) {
  function beginFlip(isReplay){
    replaying=isReplay;paused=false;flipTime=0;phase='flip';
    meter.hidden=true;launch.hidden=true;replay.hidden=true;pause.hidden=!isReplay;
-   mood.disabled=true;if(catching){controls.enabled=false}
+   if(catching){controls.enabled=false}
    pause.textContent='一時停止';status.textContent=isReplay?'リプレイ':'そりゃっ！';
  }
  replay.onclick=()=>{
    if(!lastShot)return;
-   reset();mood.selectedIndex=lastShot.mood;angle=lastShot.angle;power=lastShot.power;beginFlip(true);
+   reset();angle=lastShot.angle;power=lastShot.power;beginFlip(true);
  };
  pause.onclick=()=>{
    paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
  };
  function reset(){
-   phase=catching?'ready':'angle';mood.disabled=false;controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
+   phase=catching?'ready':'angle';controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    if(catching){
      stage.querySelector('.catch-track').hidden=true;
      grandma.body.position.set(0,0,1.8);grandma.body.rotation.z=0;
@@ -190,17 +200,18 @@ async function openTableFlip(catching=false) {
    camera.position.add(shift.copy(target).sub(controls.target));controls.target.copy(target);controls.update();
    pause.hidden=true;replay.hidden=true;replaying=false;paused=false;
    for(const p of pieces){p.layer.add(p.mesh);p.mesh.visible=true;p.mesh.position.copy(p.home);p.mesh.scale.copy(p.scale);p.mesh.rotation.set(-Math.PI/2,0,0);p.line.geometry.setDrawRange(0,0);p.landed=false;p.distance=0}
-   meter.hidden=catching;launch.disabled=false;launch.hidden=false;launch.textContent=catching?'おじいちゃん、返して！':'角度を決める';
-   status.textContent=rows.length+'段・'+pieces.length+'品　'+(catching?'おばあちゃんが受け止めます':'飛ばす角度を狙ってタップ');
+   meter.hidden=catching;launch.disabled=false;launch.hidden=catching;launch.textContent='角度を決める';
+   status.textContent=rows.length+'段・'+pieces.length+'品　'+(catching?condition.name+'のおじいちゃん、構えて！':'飛ばす角度を狙ってタップ');
  }
  launch.onclick=()=>{
    const now=performance.now();
-   if(phase==='result'){reset();return}
-   if(phase==='ready'){
-     angle=37+Math.random()*14;beginFlip(false);status.textContent=setting().name+'のおじいちゃん、振りかぶった！';return
+   if(phase==='result'){
+     if(catching)chooseGrandpaMood(moods,mood=>{condition=mood;reset()});
+     else reset();
+     return;
    }
-   if(phase==='angle'){mood.disabled=true;angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
-   if(phase==='power'){power=(8+15*wave(now))*boost*(1+.07*mood.selectedIndex);lastShot={angle,power,mood:mood.selectedIndex};beginFlip(false)}
+   if(phase==='angle'){angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
+   if(phase==='power'){power=(8+15*wave(now))*boost;lastShot={angle,power};beginFlip(false)}
  };
  function release(){
    table.updateMatrixWorld(true);
@@ -210,7 +221,7 @@ async function openTableFlip(catching=false) {
    if(catching){
      // A full three-tier meal reaches the mood's ceiling. Smaller servings retain most of its power.
      const load=.92+.08*Math.min(1,(boost-1)/.64);
-     power=autoPower(pieces,angle*Math.PI/180,setting().range*load);
+     power=autoPower(pieces,angle*Math.PI/180,condition.range*load);
    }
    for(const p of pieces){
      Object.assign(p,throwVelocity(p,power,angle*Math.PI/180));
@@ -220,8 +231,8 @@ async function openTableFlip(catching=false) {
    phase=catching?'catch':'flight';elapsed=0;
    if(catching){
      maxThrow=Math.max(...pieces.map(p=>p.vx*travelTime(p.drag,p.land)));
-     catcher.start(setting());
-     status.textContent=setting().name+'の一投！　最長 '+maxThrow.toFixed(1)+' m';
+     catcher.start(condition);
+     status.textContent=condition.name+'の一投！　最長 '+maxThrow.toFixed(1)+' m';
    }
    burst(new T.Vector3(0,2,0),75);
  }
@@ -253,7 +264,10 @@ async function openTableFlip(catching=false) {
  function draw(now){
    if(!game.open)return;
    const dt=Math.min(.05,(now-last)/1000||0);last=now;
-   if(phase==='ready'||phase==='angle'||phase==='power')grandpa.body.rotation.z=Math.sin(now*.003*setting().pace)*setting().sway*.25;
+   if(phase==='ready'||phase==='angle'||phase==='power')grandpa.body.rotation.z=Math.sin(now*.003*condition.pace)*condition.sway*.25;
+   if(phase==='ready'&&now-started>=950){
+     angle=37+Math.random()*14;beginFlip(false);status.textContent=condition.name+'のおじいちゃん、振りかぶった！';
+   }
    if(phase==='angle'||phase==='power'){
      const value=wave(now);meter.value=value*100;
      if(phase==='power')table.rotation.z=Math.sin(now*.032)*value*.035;
