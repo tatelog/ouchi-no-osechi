@@ -265,7 +265,10 @@ async function createTrayImage(){
  }
  const blob=await new Promise(resolve=>canvas.toBlob(resolve));if(!blob)throw Error();return blob
 }
-document.querySelector('#home-button').onclick=showHome;
+document.querySelector('.title-home').onclick=event=>{
+ if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+ event.preventDefault();showHome();
+};
 migrateMeals();
 if(referenceEntry)render();else showHome();
 function serving(id,k){

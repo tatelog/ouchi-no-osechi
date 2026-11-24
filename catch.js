@@ -77,15 +77,24 @@ export function bestThrowAngle(pieces,power){
  return bestAngle*180/Math.PI;
 }
 
-export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust,onFinish}){
- let active=false,t=0,desired=0,eaten=0,chew=0,settings,extent,missed,nextComplaint;
+export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust,onMiss,onFinish}){
+ let active=false,t=0,desired=0,eaten=0,chew=0,settings,extent,sprint,missed,nextComplaint;
  const entranceDuration=.62;
  let entryX=0,dustTime=0,drag=null;
  const keys=new Set(),point=new T.Vector3(),body=grandma.body;
  const ctx=track.getContext('2d');
  function steer(e){
    const r=e.currentTarget.getBoundingClientRect();
-   desired=T.MathUtils.clamp((e.clientX-r.left)/r.width,0,1)*extent;
+   const fraction=e.currentTarget===track
+     ? ((e.clientX-r.left)/r.width*track.width-5)/(track.width-10)
+     : (e.clientX-r.left)/r.width;
+   desired=T.MathUtils.clamp(fraction,0,1)*extent;
+   let tolerance=extent*12/r.width;
+   const aim=desired;
+   for(const p of pieces){
+     const gap=Math.abs(p.dest-aim);
+     if(p.state==='loose'&&gap<tolerance){desired=p.dest;tolerance=gap}
+   }
  }
  for(const el of [surface,track]){
    el.addEventListener('pointerdown',e=>{
@@ -116,11 +125,23 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust
  }
  return {
    get entering(){return active&&t<entranceDuration},
-   start(mood,startX){
+   start(mood,startX,flightRate){
      active=true;missed=0;nextComplaint=0;settings=mood;t=0;eaten=0;chew=0;drag=null;keys.clear();desired=0;
      entryX=startX;dustTime=0;body.position.set(entryX,0,1.8);body.visible=true;
+     sprint=mood.sprint*1.8;
      for(const p of pieces){
-       p.state='loose';p.dest=p.origin.x+p.vx*travelTime(p.drag,p.land);p.from=new T.Vector3();
+       // Aim for a descending dish at arm height, before it touches the ground.
+       let low=p.peak,high=p.land;
+       for(let i=0;i<24;i++){
+         const mid=(low+high)/2;
+         if(throwHeight(p.origin.y,p.vy,p.drag,mid)>1.2)low=mid;else high=mid;
+       }
+       p.intercept=(low+high)/2/flightRate;
+       const travel=travelTime(p.drag,p.intercept*flightRate);
+       p.catchZ=p.origin.z+p.vz*travel;
+       p.state='loose';p.dest=p.origin.x+p.vx*travel;p.from=new T.Vector3();
+       const runningTime=Math.max(.08,p.intercept-entranceDuration-.55);
+       sprint=Math.max(sprint,1.65*Math.hypot(p.dest,p.catchZ-1.8)/runningTime);
      }
      extent=Math.ceil((Math.max(...pieces.map(p=>p.dest))+2)/5)*5;
      track.hidden=false;drawTrack();
@@ -130,9 +151,9 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust
    tick(dt){
      if(!active)return;
      t+=dt;chew=Math.max(0,chew-dt);
-     const step=settings.sprint*dt;
+     const step=sprint*dt;
      desired=T.MathUtils.clamp(desired+step*(Number(keys.has('ArrowRight'))-Number(keys.has('ArrowLeft'))),0,extent);
-     const prev=body.position.x;
+     const prev=body.position.x,prevZ=body.position.z;
      const entering=t<entranceDuration;
      if(entering){
        const progress=t/entranceDuration;
@@ -142,10 +163,10 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust
      let nearest=null,gap=Infinity;
      for(const p of pieces){
        if(p.state!=='loose')continue;
-       const dx=Math.abs(p.mesh.position.x-body.position.x);
+       const dx=Math.abs(p.dest-desired);
        if(dx<gap){nearest=p;gap=dx}
      }
-     if(nearest&&!entering)body.position.z+=T.MathUtils.clamp(nearest.mesh.position.z-body.position.z,-step,step);
+     if(nearest&&!entering)body.position.z+=T.MathUtils.clamp(nearest.catchZ-body.position.z,-step,step);
      const running=entering||Math.abs(prev-body.position.x)>.01;
      const stride=running?Math.sin(t*31):0;
      body.position.y=running?Math.abs(stride)*.24:chew*.35;
@@ -157,7 +178,12 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust
      if(running&&t>=dustTime){kickDust(body.position);dustTime=t+.085}
      for(const p of pieces){
        if(p.state==='loose'){
-         if(p.landed){
+         const crosses=t>=p.intercept&&t-dt<=p.intercept;
+         const blend=crosses?T.MathUtils.clamp((p.intercept-(t-dt))/dt,0,1):0;
+         const metInAir=crosses&&Math.abs(T.MathUtils.lerp(prev,body.position.x,blend)-p.dest)<=settings.reach&&
+           Math.abs(T.MathUtils.lerp(prevZ,body.position.z,blend)-p.catchZ)<=1;
+         if(p.landed&&!metInAir){
+           onMiss(p);
            p.state='missed';missed++;
            if(t>=nextComplaint){
              say(['ああっ、もったいない！','その手はお箸に使いな！','畳に食べさせてどうすんの！'][(missed-1)%3]);
@@ -167,7 +193,7 @@ export function catchingGame({T,surface,pieces,status,grandma,track,say,kickDust
            continue;
          }
          const {x,y}=p.mesh.position;
-         if(p.descending && y<=1.65 && Math.abs(p.mesh.position.z-body.position.z)<=1 && x>=Math.min(prev,body.position.x)-settings.reach && x<=Math.max(prev,body.position.x)+settings.reach){
+         if(metInAir || p.descending && y<=1.65 && Math.abs(p.mesh.position.z-body.position.z)<=1 && x>=Math.min(prev,body.position.x)-settings.reach && x<=Math.max(prev,body.position.x)+settings.reach){
            p.state='eating';p.bite=t;p.from.copy(p.mesh.position);eaten++;chew=.42;
            p.line.geometry.setDrawRange(0,0);
            status.textContent=names[p.id]+'をぱくり！　'+eaten+'／'+pieces.length+'品';

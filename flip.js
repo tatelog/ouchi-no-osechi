@@ -6,7 +6,7 @@ function chooseGrandpaMood(moods,onSelect){
 async function openTableFlip(catching=false,chosenMood=null) {
  if(catching&&!chosenMood){
    try{
-     const {moods}=await import('./catch.js?v=5');
+     const {moods}=await import('./catch.js?v=6');
      chooseGrandpaMood(moods,mood=>openTableFlip(true,mood));
    }catch{notice('コンディションを読み込めませんでした。もう一度お試しください')}
    return;
@@ -22,7 +22,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    game.querySelector('small').textContent='印をタップして、落ちる前にキャッチ！　ドラッグ・左右キーでも移動できます';
    const course=document.createElement('canvas');
    course.className='catch-track';course.width=640;course.height=48;course.hidden=true;
-   course.setAttribute('aria-label','回収コース。印は具材の着地点、紫はおばあちゃん');
+   course.setAttribute('aria-label','回収コース。印は具材のキャッチ位置、紫はおばあちゃん');
    game.querySelector('.flip-stage').append(course);
  }
  document.body.append(game);
@@ -46,7 +46,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=5'),import('./throw-overlay.js')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame,throwVelocity,travelTime,throwHeight,bestThrowAngle},{throwOverlay}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=6'),import('./throw-overlay.js')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -200,7 +200,9 @@ async function openTableFlip(catching=false,chosenMood=null) {
      title+'.png'
    );
  }
- const catcher=catching?catchingGame({T,surface,pieces,status,grandma,say,kickDust:pos=>burst(pos,6),track:stage.querySelector(".catch-track"),onFinish:(count,missed)=>{
+ const flightRate=1.45;
+ function landingEffect(p){overlay.land(p);burst(p.mesh.position,16)}
+ const catcher=catching?catchingGame({T,surface,pieces,status,grandma,say,onMiss:landingEffect,kickDust:pos=>burst(pos,6),track:stage.querySelector(".catch-track"),onFinish:(count,missed)=>{
    phase='result';controls.enabled=true;launch.hidden=false;launch.textContent='もう一度遊ぶ';
    offerResultShare('お粗末にしない',[
      condition.name+'の一投！　'+rows.length+'段重・最長 '+maxThrow.toFixed(1)+' m',
@@ -316,7 +318,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
      const distance=Math.max(8,4.6/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
      camera.position.set(0,2.9,distance);camera.lookAt(target);camera.updateMatrixWorld();
      const leftEdge=-(distance*Math.tan(camera.fov*Math.PI/360)*camera.aspect+1.8);
-     catcher.start(condition,leftEdge);
+     catcher.start(condition,leftEdge,flightRate);
      status.textContent=condition.name+'の一投！　'+angle.toFixed(1)+'°・最長 '+maxThrow.toFixed(1)+' m';
    }
    burst(new T.Vector3(0,2,0),75);
@@ -331,7 +333,7 @@ async function openTableFlip(catching=false,chosenMood=null) {
      p.mesh.rotation.set(-1.1+u*(2+p.id%5),u*2,u*(1+p.id%3));
      p.trailPos.copyWithin(3,0,141);p.mesh.position.toArray(p.trailPos,0);p.samples=Math.min(48,p.samples+1);
      p.line.geometry.attributes.position.needsUpdate=true;p.line.geometry.setDrawRange(0,p.samples);
-     if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;overlay.land(p);burst(p.mesh.position,16)}
+     if(u>=p.land){p.landed=true;p.mesh.rotation.x=-Math.PI/2;if(!catching)landingEffect(p)}
    }
    if(catching)return;
    const lead=pieces.reduce((a,b)=>a.distance>b.distance?a:b);
@@ -371,8 +373,8 @@ async function openTableFlip(catching=false,chosenMood=null) {
      }
      if(f===1)release();
    }else if(phase==='catch'){
-     table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45);catcher.tick(dt);if(!catcher.entering)frameCatch(dt);
-   }else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
+     table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*flightRate);catcher.tick(dt);if(!catcher.entering)frameCatch(dt);
+   }else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*flightRate)}
    for(let i=sparks.length-1;i>=0;i--){if(paused)break;const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
    sparks.forEach((s,i)=>{s.p.toArray(coords,i*3);s.color.toArray(colors,i*3)});
    particles.attributes.position.needsUpdate=true;particles.attributes.color.needsUpdate=true;particles.setDrawRange(0,sparks.length);
