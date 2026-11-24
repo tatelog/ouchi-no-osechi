@@ -3,7 +3,7 @@ async function openTableFlip() {
  const game = document.createElement('dialog');
  game.className = 'flip-game';
  game.setAttribute('aria-label','ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>ドラッグで回転・ピンチで拡大</small><div class="flip-views" role="group" aria-label="カメラの視点"><button>斜め</button><button>横</button><button>上</button></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
+ game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><div class="flip-views" role="group" aria-label="カメラの視点"><button>斜め</button><button>横</button><button>上</button></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
  document.body.append(game);
  // Fullscreen the document: modal dialogs themselves are ineligible fullscreen targets.
  const page=document.documentElement;
@@ -42,6 +42,30 @@ async function openTableFlip() {
  controls=new OrbitControls(camera,renderer.domElement);
  controls.enablePan=false;controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=35;
  controls.maxPolarAngle=Math.PI*.49;
+ const surface=renderer.domElement;
+ const pointers=new Set();
+ let tap=null;
+ surface.addEventListener('pointerdown',event=>{
+   pointers.add(event.pointerId);
+   tap=pointers.size===1 && event.button===0 ? {id:event.pointerId,x:event.clientX,y:event.clientY} : null;
+ });
+ surface.addEventListener('pointermove',event=>{
+   if(tap?.id===event.pointerId && Math.hypot(event.clientX-tap.x,event.clientY-tap.y)>8)tap=null;
+ });
+ surface.addEventListener('pointercancel',event=>{pointers.delete(event.pointerId);tap=null});
+ surface.addEventListener('pointerup',event=>{
+   pointers.delete(event.pointerId);
+   if(tap?.id!==event.pointerId)return;
+   tap=null;
+   const bounds=surface.getBoundingClientRect();
+   const x=(event.clientX-bounds.left)/bounds.width-.5;
+   const y=(event.clientY-bounds.top)/bounds.height-.5;
+   const orbit=new T.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+   if(Math.abs(x)>=Math.abs(y))orbit.theta+=(x<0?-1:1)*Math.PI/6;
+   else orbit.phi=T.MathUtils.clamp(orbit.phi+Math.sign(y)*Math.PI/10,.05,controls.maxPolarAngle);
+   camera.position.setFromSpherical(orbit).add(controls.target);
+   controls.update();
+ });
  const viewOffsets=[new T.Vector3(4.5,6,7.4),new T.Vector3(0,2,10),new T.Vector3(0,10,.05)];
  game.querySelectorAll('.flip-views button').forEach((button,i)=>{
    button.onclick=()=>{camera.position.copy(controls.target).add(viewOffsets[i]);controls.update()};
