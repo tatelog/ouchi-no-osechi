@@ -1,9 +1,14 @@
-async function openTableFlip() {
+async function openTableFlip(catching=false) {
  const meal = draft();
  const game = document.createElement('dialog');
  game.className = 'flip-game';
  game.setAttribute('aria-label','ちゃぶ台返し');
- game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><div class="flip-views" role="group" aria-label="カメラの視点"><button>斜め</button><button>横</button><button>上</button></div><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
+ game.innerHTML = '<h2>ちゃぶ台返し</h2><div class="flip-stage"></div><small>上下左右をタップ・クリックで視点変更。ドラッグで回転、ピンチで拡大</small><label class="flip-mood">おじいちゃんの調子 <select></select></label><p role="status">お重をちゃぶ台に載せています…</p><meter min="0" max="100" hidden aria-label="タイミング"></meter><div><button class="primary flip-launch" disabled>角度を決める</button><button class="flip-replay" hidden>リプレイ</button><button class="flip-pause" hidden>一時停止</button><button class="flip-exit">お重に戻る</button></div>';
+ if(catching){
+   game.querySelector('h2').textContent='おばあちゃん、いただきます！';
+   game.setAttribute('aria-label','お粗末にしない');
+   game.querySelector('small').textContent='投げた料理をキャッチ！　タップ・ドラッグか左右キーでおばあちゃんを移動';
+ }
  document.body.append(game);
  // Fullscreen the document: modal dialogs themselves are ineligible fullscreen targets.
  const page=document.documentElement;
@@ -25,7 +30,7 @@ async function openTableFlip() {
    renderer?.dispose();renderer?.forceContextLoss();game.remove();
  },{once:true});
  try {
- const [T,{OrbitControls}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js')]);
+ const [T,{OrbitControls},{elder,moods,catchingGame}]=await Promise.all([import('./assets/vendor/three.module.js'),import('./assets/vendor/orbit-controls.js'),import('./catch.js?v=1')]);
  if(!game.open)return;
  renderer=new T.WebGLRenderer({antialias:true,alpha:false});
  stage.append(renderer.domElement);
@@ -43,6 +48,9 @@ async function openTableFlip() {
  controls.enablePan=false;controls.enableDamping=true;controls.minDistance=3;controls.maxDistance=35;
  controls.maxPolarAngle=Math.PI*.49;
  const surface=renderer.domElement;
+ const mood=game.querySelector('.flip-mood select');
+ for(const option of moods)mood.add(new Option(option.name));
+ const setting=()=>moods[mood.selectedIndex];
  const pointers=new Set();
  let tap=null;
  surface.addEventListener('pointerdown',event=>{
@@ -55,7 +63,7 @@ async function openTableFlip() {
  surface.addEventListener('pointercancel',event=>{pointers.delete(event.pointerId);tap=null});
  surface.addEventListener('pointerup',event=>{
    pointers.delete(event.pointerId);
-   if(tap?.id!==event.pointerId)return;
+   if(!controls.enabled||tap?.id!==event.pointerId)return;
    tap=null;
    const bounds=surface.getBoundingClientRect();
    const x=(event.clientX-bounds.left)/bounds.width-.5;
@@ -66,10 +74,7 @@ async function openTableFlip() {
    camera.position.setFromSpherical(orbit).add(controls.target);
    controls.update();
  });
- const viewOffsets=[new T.Vector3(4.5,6,7.4),new T.Vector3(0,2,10),new T.Vector3(0,10,.05)];
- game.querySelectorAll('.flip-views button').forEach((button,i)=>{
-   button.onclick=()=>{camera.position.copy(controls.target).add(viewOffsets[i]);controls.update()};
- });
+ const initialView=new T.Vector3(3.4,6,7.4);
  const light=new T.DirectionalLight(0xffefcc,2.8);light.position.set(-5,10,6);scene.add(light,new T.HemisphereLight(0xfff6e0,0xe2ae87,2));
  const group=parent=>{const g=new T.Group();parent.add(g);return g};
  function box(parent,x,y,z,w,h,l,color){
@@ -79,16 +84,28 @@ async function openTableFlip() {
  box(scene,90,-.15,0,450,.3,130,0xb7af78);
  for(let m=0;m<=220;m+=5)box(scene,m,.012,0,.055,.02,m%10===0?9:5,0xf6e3af);
  const table=group(scene);
- box(table,0,1.02,0,3.8,.18,3.2,0x84412b);
- for(const x of [-1.5,1.5])for(const z of [-1.2,1.2])box(table,x,.48,z,.19,.96,.19,0x653321);
+ const rows=meal.tiers;
+ const columns=Math.min(2,rows.length),depth=Math.ceil(rows.length/columns);
+ const trayScale=rows.length===1?1:.78;
+ const tableWidth=columns*3*trayScale+.65,tableDepth=depth*2.9*trayScale+.48;
+ box(table,0,1.02,0,tableWidth,.18,tableDepth,0x84412b);
+ for(const x of [-1,1])for(const z of [-1,1])box(table,x*(tableWidth/2-.25),.48,z*(tableDepth/2-.25),.19,.96,.19,0x653321);
+ const grandpa=elder(T,scene,false);grandpa.body.position.set(-tableWidth/2-.3,0,0);
+ grandpa.body.scale.setScalar(1.3);
+ const grandma=catching?elder(T,scene,true):null;
+ if(grandma)grandma.body.position.set(0,0,1.8);
  const pieces=[],loader=new T.TextureLoader();
- const rows=meal.tiers.filter(row=>row.some(id=>id!=null));
  rows.forEach((row,tier)=>{
-   const y=1.17+tier*.42;
-   box(table,0,y,0,2.85,.15,2.65,0x651b0f);
+   const layer=group(table);
+   const rowIndex=Math.floor(tier/columns);
+   const rowSize=Math.min(columns,rows.length-rowIndex*columns);
+   layer.position.set((tier%columns-(rowSize-1)/2)*3*trayScale,1.2,(rowIndex-(depth-1)/2)*2.9*trayScale);
+   layer.scale.setScalar(trayScale);
+   const y=0;
+   box(layer,0,y,0,2.85,.15,2.65,0x651b0f);
    for(const sign of [-1,1]){
-     box(table,sign*1.39,y+.14,0,.09,.34,2.65,0x9b3022);
-     box(table,0,y+.14,sign*1.28,2.85,.34,.09,0x9b3022);
+     box(layer,sign*1.39,y+.14,0,.09,.34,2.65,0x9b3022);
+     box(layer,0,y+.14,sign*1.28,2.85,.34,.09,0x9b3022);
    }
    const layout=arrangeTray(row);
    row.forEach((id,i)=>{
@@ -102,12 +119,12 @@ async function openTableFlip() {
      const tex=textures.get(path);
      const mesh=new T.Mesh(new T.PlaneGeometry(1,1),new T.MeshBasicMaterial({map:tex,transparent:true,alphaTest:.08,side:T.DoubleSide}));
      mesh.position.set(((r.x+r.w/2)/100-.5)*2.64,y+.19+i*.004,((r.y+r.h/2)/100-.5)*2.44);
-     mesh.rotation.x=-Math.PI/2;mesh.scale.set(r.w*.026,r.h*.024,1);table.add(mesh);
+     mesh.rotation.x=-Math.PI/2;mesh.scale.set(r.w*.026,r.h*.024,1);layer.add(mesh);
      const trailPos=new Float32Array(48*3),geo=new T.BufferGeometry();
      geo.setAttribute('position',new T.BufferAttribute(trailPos,3));geo.setDrawRange(0,0);
      const line=new T.Line(geo,new T.LineBasicMaterial({color:new T.Color().setHSL((id*.123)%1,.84,.53),transparent:true,opacity:.8}));
      line.frustumCulled=false;scene.add(line);
-     pieces.push({id,mesh,home:mesh.position.clone(),scale:mesh.scale.clone(),line,trailPos});
+     pieces.push({id,mesh,layer,tier,slot:i,home:mesh.position.clone(),scale:mesh.scale.clone(),line,trailPos});
    });
  });
  // Confetti bursts use one shared point cloud, including simultaneous landings.
@@ -123,38 +140,50 @@ async function openTableFlip() {
  const boost=1+.11*(rows.length-1)+.021*(pieces.length-1);
  let phase,started,angle,power,elapsed,last,best=0;
  try{best=Number(localStorage.getItem('osechi-flip-3d-best'))||0}catch{}
- const wave=time=>(1-Math.cos((time-started)/380))/2;
+ const wave=time=>(1-Math.cos((time-started)*setting().pace/380))/2;
  const target=new T.Vector3(), shift=new T.Vector3();
  let lastShot, replaying=false, paused=false, flipTime=0;
+ const catcher=catching?catchingGame({T,scene,camera,surface,pieces,status,grandma,onFinish:count=>{
+   phase='result';controls.enabled=true;launch.hidden=false;launch.textContent='もう一度遊ぶ';
+   status.textContent='ごちそうさま！　'+rows.length+'段のおせち、'+count+'品を全部食べました。';
+ }}):null;
+ function frameCatch(){
+   const dist=Math.max(9,5/(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
+   target.set(0,1.65,0);controls.target.copy(target);
+   camera.position.set(0,1.65+dist*.29,dist);camera.lookAt(target);
+ }
  function beginFlip(isReplay){
    replaying=isReplay;paused=false;flipTime=0;phase='flip';
    meter.hidden=true;launch.hidden=true;replay.hidden=true;pause.hidden=!isReplay;
+   mood.disabled=true;if(catching){controls.enabled=false;frameCatch()}
    pause.textContent='一時停止';status.textContent=isReplay?'リプレイ':'そりゃっ！';
  }
  replay.onclick=()=>{
    if(!lastShot)return;
-   reset();angle=lastShot.angle;power=lastShot.power;beginFlip(true);
+   reset();mood.selectedIndex=lastShot.mood;angle=lastShot.angle;power=lastShot.power;beginFlip(true);
  };
  pause.onclick=()=>{
    paused=!paused;pause.textContent=paused?'再生を続ける':'一時停止';
  };
  function reset(){
-   phase='angle';started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
+   phase=catching?'ready':'angle';mood.disabled=false;controls.enabled=true;grandpa.body.rotation.z=0;started=performance.now();elapsed=0;sparks.length=0;table.rotation.z=0;
    target.set(0,1,0);
    camera.position.add(shift.copy(target).sub(controls.target));controls.target.copy(target);controls.update();
    pause.hidden=true;replay.hidden=true;replaying=false;paused=false;
-   for(const p of pieces){table.add(p.mesh);p.mesh.position.copy(p.home);p.mesh.scale.copy(p.scale);p.mesh.rotation.set(-Math.PI/2,0,0);p.line.geometry.setDrawRange(0,0);p.landed=false;p.distance=0}
-   meter.hidden=false;launch.disabled=false;launch.hidden=false;launch.textContent='角度を決める';
-   status.textContent=rows.length+'段・'+pieces.length+'品　飛ばす角度を狙ってタップ';
+   for(const p of pieces){p.layer.add(p.mesh);p.mesh.visible=true;p.mesh.position.copy(p.home);p.mesh.scale.copy(p.scale);p.mesh.rotation.set(-Math.PI/2,0,0);p.line.geometry.setDrawRange(0,0);p.landed=false;p.distance=0}
+   meter.hidden=catching;launch.disabled=false;launch.hidden=false;launch.textContent=catching?'おじいちゃん、返して！':'角度を決める';
+   status.textContent=rows.length+'段・'+pieces.length+'品　'+(catching?'おばあちゃんが受け止めます':'飛ばす角度を狙ってタップ');
  }
  launch.onclick=()=>{
    const now=performance.now();
    if(phase==='result'){reset();return}
-   if(phase==='angle'){angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
-   if(phase==='power'){power=(8+15*wave(now))*boost;lastShot={angle,power};beginFlip(false)}
+   if(phase==='ready'){beginFlip(false);return}
+   if(phase==='angle'){mood.disabled=true;angle=18+54*wave(now);started=now;phase='power';launch.textContent='ちゃぶ台を返す！';return}
+   if(phase==='power'){power=(8+15*wave(now))*boost*(1+.07*mood.selectedIndex);lastShot={angle,power,mood:mood.selectedIndex};beginFlip(false)}
  };
  function release(){
    table.updateMatrixWorld(true);
+   if(catching){phase='catch';catcher.start(setting());return}
    for(const p of pieces){
      scene.attach(p.mesh);p.origin=p.mesh.position.clone();
      // Each dish has a repeatable launch response and air resistance.
@@ -193,15 +222,16 @@ async function openTableFlip() {
  function draw(now){
    if(!game.open)return;
    const dt=Math.min(.05,(now-last)/1000||0);last=now;
+   if(phase==='ready'||phase==='angle'||phase==='power')grandpa.body.rotation.z=Math.sin(now*.003*setting().pace)*setting().sway*.25;
    if(phase==='angle'||phase==='power'){
      const value=wave(now);meter.value=value*100;
      if(phase==='power')table.rotation.z=Math.sin(now*.032)*value*.035;
      status.textContent=rows.length+'段・'+pieces.length+'品　'+(phase==='angle'?'角度 '+Math.round(18+54*value)+'°':'角度 '+Math.round(angle)+'°　力 '+Math.round(value*100)+'％');
      target.set(0,1,0);
    }else if(phase==='flip'){
-     flipTime+=paused?0:dt;const f=Math.min(1,flipTime/.38);table.rotation.z=-.68*f*f;target.set(0,1.4,0);
+     flipTime+=paused?0:dt;const f=Math.min(1,flipTime/.38);table.rotation.z=-(catching ? .42 : .68)*f*f;grandpa.body.rotation.z=-.42*Math.sin(f*Math.PI/2);if(!catching)target.set(0,1.4,0);
      if(f===1)release();
-   }else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
+   }else if(phase==='catch'){frameCatch();catcher.tick(dt)}else if(phase==='flight'&&!paused){table.rotation.z=Math.max(-2.85,table.rotation.z-dt*3);flight(dt*1.45)}
    for(let i=sparks.length-1;i>=0;i--){if(paused)break;const s=sparks[i];s.life-=dt;s.v.y-=dt*6;s.p.addScaledVector(s.v,dt);if(s.life<=0)sparks.splice(i,1)}
    sparks.forEach((s,i)=>{s.p.toArray(coords,i*3);s.color.toArray(colors,i*3)});
    particles.attributes.position.needsUpdate=true;particles.attributes.color.needsUpdate=true;particles.setDrawRange(0,sparks.length);
@@ -209,7 +239,7 @@ async function openTableFlip() {
    controls.target.add(shift);camera.position.add(shift);controls.update();
    renderer.render(scene,camera);frame=requestAnimationFrame(draw);
  }
- camera.position.copy(viewOffsets[0]);reset();last=performance.now();frame=requestAnimationFrame(draw);
+ camera.position.copy(initialView).multiplyScalar(Math.max(1,(tableWidth+1.6)/(6.6*camera.aspect)));reset();last=performance.now();frame=requestAnimationFrame(draw);
  }catch(error){status.textContent='3D画面を開けませんでした。WebGL 2対応のブラウザでお試しください。';launch.hidden=true;console.error(error)}
 }
 
